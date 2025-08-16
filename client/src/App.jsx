@@ -4,6 +4,41 @@ import './App.css';
 
 const socket = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
 
+const translations = {
+  en: {
+    joinGame: 'Join Game',
+    name: 'Name',
+    room: 'Room',
+    addComputer: 'Add Computer',
+    join: 'Join',
+    roomHeading: 'Room',
+    start: 'Start',
+    topCard: 'Top Card',
+    yourHand: 'Your hand',
+    yourTurn: '(Your turn)',
+    draw: 'Draw',
+    players: 'Players',
+    turn: 'Turn',
+    cards: 'cards',
+  },
+  tr: {
+    joinGame: 'Oyuna Katıl',
+    name: 'İsim',
+    room: 'Oda',
+    addComputer: 'Bilgisayar Ekle',
+    join: 'Katıl',
+    roomHeading: 'Oda',
+    start: 'Başlat',
+    topCard: 'Üst Kart',
+    yourHand: 'Eliniz',
+    yourTurn: '(Sıra sizde)',
+    draw: 'Kart Çek',
+    players: 'Oyuncular',
+    turn: 'Sıra',
+    cards: 'kart',
+  },
+};
+
 function App() {
   const [id, setId] = useState('');
   const [name, setName] = useState('');
@@ -11,6 +46,10 @@ function App() {
   const [joined, setJoined] = useState(false);
   const [state, setState] = useState(null);
   const [ai, setAi] = useState(false);
+  const [lang, setLang] = useState('tr');
+  const [playingIndex, setPlayingIndex] = useState(null);
+
+  const t = (key) => translations[lang][key] || key;
 
   useEffect(() => {
     socket.on('connect', () => setId(socket.id));
@@ -31,8 +70,12 @@ function App() {
     socket.emit('start', { room, ai });
   };
 
-  const play = (card) => {
-    socket.emit('play', { room, card });
+  const play = (card, idx) => {
+    setPlayingIndex(idx);
+    setTimeout(() => {
+      socket.emit('play', { room, card });
+      setPlayingIndex(null);
+    }, 300);
   };
 
   const draw = () => {
@@ -42,14 +85,18 @@ function App() {
   if (!joined) {
     return (
       <div className="join">
-        <h2>Join Game</h2>
-        <input placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
-        <input placeholder="Room" value={room} onChange={e => setRoom(e.target.value)} />
+        <select className="lang-select" value={lang} onChange={e => setLang(e.target.value)}>
+          <option value="tr">Türkçe</option>
+          <option value="en">English</option>
+        </select>
+        <h2>{t('joinGame')}</h2>
+        <input placeholder={t('name')} value={name} onChange={e => setName(e.target.value)} />
+        <input placeholder={t('room')} value={room} onChange={e => setRoom(e.target.value)} />
         <label>
           <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
-          Add Computer
+          {t('addComputer')}
         </label>
-        <button onClick={join}>Join</button>
+        <button onClick={join}>{t('join')}</button>
       </div>
     );
   }
@@ -57,11 +104,11 @@ function App() {
   if (!state || !state.started) {
     return (
       <div className="lobby">
-        <h2>Room: {room}</h2>
+        <h2>{t('roomHeading')}: {room}</h2>
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
         </ul>
-        <button onClick={start}>Start</button>
+        <button onClick={start}>{t('start')}</button>
       </div>
     );
   }
@@ -71,20 +118,28 @@ function App() {
 
   return (
     <div className="game">
-      <h2>Top Card: {state.top.color} {state.top.value}</h2>
-      <h3>Your hand {myTurn ? '(Your turn)' : ''}</h3>
+      <h2>{t('topCard')}: {state.top.color} {state.top.value}</h2>
+      <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
+      <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
       <div className="hand">
         {me.hand.map((c, idx) => (
-          <button key={idx} className={`card ${c.color}`} onClick={() => play(c)}>
-            {c.color} {c.value}
+          <button
+            key={idx}
+            className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
+            onClick={() => play(c, idx)}
+            style={{ backgroundImage: `url(/cards/${c.color}_${c.value}.svg)` }}
+          >
+            <span className="sr-only">{c.color} {c.value}</span>
           </button>
         ))}
       </div>
-      <button onClick={draw}>Draw</button>
-      <h3>Players</h3>
-      <ul>
+      <button onClick={draw}>{t('draw')}</button>
+      <h3>{t('players')}</h3>
+      <ul className="players">
         {state.players.map(p => (
-          <li key={p.id}>{p.name}: {p.hand.length} cards</li>
+          <li key={p.id} className={state.current === p.id ? 'current' : ''}>
+            {p.name}: {p.hand.length} {t('cards')}
+          </li>
         ))}
       </ul>
     </div>
