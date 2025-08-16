@@ -54,6 +54,7 @@ io.on('connection', socket => {
     if (game && game.play(socket.id, card)) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);
+      if (!game.started) io.emit('lobbies', getLobbies());
     }
   });
 
@@ -62,6 +63,7 @@ io.on('connection', socket => {
     if (game && game.draw(socket.id)) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);
+      if (!game.started) io.emit('lobbies', getLobbies());
     }
   });
 
