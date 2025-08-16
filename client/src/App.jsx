@@ -22,6 +22,10 @@ const translations = {
     players: 'Players',
     turn: 'Turn',
     cards: 'cards',
+    roomExists: 'Room already exists',
+    roomNotFound: 'Room not found',
+    invalidMove: 'Invalid move',
+    notYourTurn: 'Not your turn',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4' },
   },
@@ -40,6 +44,10 @@ const translations = {
     players: 'Oyuncular',
     turn: 'Sıra',
     cards: 'kart',
+    roomExists: 'Oda zaten mevcut',
+    roomNotFound: 'Oda bulunamadı',
+    invalidMove: 'Geçersiz hamle',
+    notYourTurn: 'Sıra sizde değil',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker' },
   },
@@ -57,7 +65,8 @@ function App() {
   const [hand, setHand] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
   const [lobbies, setLobbies] = useState([]);
-  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
+  const [actionPending, setActionPending] = useState(false);
 
   const myTurn = state?.current === id;
 
@@ -73,12 +82,20 @@ function App() {
   };
   const displayValue = (val) => cardIcons[val] ? `${cardIcons[val]} ${valueText(val)}` : valueText(val);
 
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
   useEffect(() => {
     socket.on('connect', () => setId(socket.id));
-    socket.on('state', st => setState(st));
+    socket.on('state', st => {
+      setState(st);
+      setActionPending(false);
+    });
     socket.on('lobbies', setLobbies);
     socket.on('joinError', msg => {
-      setError(msg);
+      showToast(msg === 'exists' ? t('roomExists') : t('roomNotFound'));
       setJoined(false);
     });
     return () => {
@@ -112,7 +129,18 @@ function App() {
   };
 
   const play = (card, idx) => {
-    if (!myTurn) return;
+    if (!myTurn) {
+      showToast(t('notYourTurn'));
+      return;
+    }
+    if (actionPending) return;
+    const top = state.top;
+    const canPlay = card.color === 'wild' || card.color === top.color || card.value === top.value;
+    if (!canPlay) {
+      showToast(t('invalidMove'));
+      return;
+    }
+    setActionPending(true);
     setPlayingIndex(idx);
     setHand(h => {
       const newHand = [...h];
@@ -126,7 +154,12 @@ function App() {
   };
 
   const draw = () => {
-    if (!myTurn) return;
+    if (!myTurn) {
+      showToast(t('notYourTurn'));
+      return;
+    }
+    if (actionPending) return;
+    setActionPending(true);
     socket.emit('draw', { room });
   };
 
@@ -140,15 +173,15 @@ function App() {
     setDragIndex(null);
   };
 
+  let content;
   if (!joined) {
-    return (
+    content = (
       <div className="join">
         <select className="lang-select" value={lang} onChange={e => setLang(e.target.value)}>
           <option value="tr">Türkçe</option>
           <option value="en">İngilizce</option>
         </select>
         <h2>{t('joinGame')}</h2>
-        {error && <div className="error">{error}</div>}
         <input placeholder={t('name')} value={name} onChange={e => setName(e.target.value)} />
         <h3>Aktif Lobbiler</h3>
         <ul className="lobbies">
@@ -164,10 +197,8 @@ function App() {
         <button onClick={createLobby}>Oluştur</button>
       </div>
     );
-  }
-
-  if (!state || !state.started) {
-    return (
+  } else if (!state || !state.started) {
+    content = (
       <div className="lobby">
         <h2>{t('roomHeading')}: {room}</h2>
         <ul>
@@ -180,40 +211,47 @@ function App() {
         <button onClick={start}>{t('start')}</button>
       </div>
     );
+  } else {
+    content = (
+      <div className="game">
+        <h2>{t('topCard')}: {colorText(state.top.color)} {displayValue(state.top.value)}</h2>
+        <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
+        <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
+        <div className="hand">
+          {hand.map((c, idx) => (
+            <button
+              key={idx}
+              className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
+              onClick={() => play(c, idx)}
+              disabled={!myTurn || actionPending}
+              draggable
+              onDragStart={() => onDragStart(idx)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => onDrop(idx)}
+              aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
+            >
+              {cardIcons[c.value] || c.value}
+              <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
+        <h3>{t('players')}</h3>
+        <ul className="players">
+          {state.players.map(p => (
+            <li key={p.id} className={state.current === p.id ? 'current' : ''}>
+              {p.name}: {p.hand.length} {t('cards')}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   }
   return (
-    <div className="game">
-      <h2>{t('topCard')}: {colorText(state.top.color)} {displayValue(state.top.value)}</h2>
-      <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
-      <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
-      <div className="hand">
-        {hand.map((c, idx) => (
-          <button
-            key={idx}
-            className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
-            onClick={() => play(c, idx)}
-            disabled={!myTurn}
-            draggable
-            onDragStart={() => onDragStart(idx)}
-            onDragOver={e => e.preventDefault()}
-            onDrop={() => onDrop(idx)}
-            aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
-          >
-            {cardIcons[c.value] || c.value}
-            <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
-          </button>
-        ))}
-      </div>
-      <button onClick={draw} disabled={!myTurn}>{t('draw')}</button>
-      <h3>{t('players')}</h3>
-      <ul className="players">
-        {state.players.map(p => (
-          <li key={p.id} className={state.current === p.id ? 'current' : ''}>
-            {p.name}: {p.hand.length} {t('cards')}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <>
+      {content}
+      {toast && <div className="toast">{toast}</div>}
+    </>
   );
 }
 
