@@ -57,6 +57,8 @@ function App() {
   const [hand, setHand] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
 
+  const myTurn = state?.current === id;
+
   const t = (key) => translations[lang][key] || key;
   const colorText = (color) => translations[lang].colors[color] || color;
   const valueText = (value) => translations[lang].values[value] || value;
@@ -94,6 +96,7 @@ function App() {
   };
 
   const play = (card, idx) => {
+    if (!myTurn) return;
     setPlayingIndex(idx);
     setHand(h => {
       const newHand = [...h];
@@ -107,6 +110,7 @@ function App() {
   };
 
   const draw = () => {
+    if (!myTurn) return;
     socket.emit('draw', { room });
   };
 
@@ -150,9 +154,6 @@ function App() {
       </div>
     );
   }
-
-  const myTurn = state.current === id;
-
   return (
     <div className="game">
       <h2>{t('topCard')}: {colorText(state.top.color)} {displayValue(state.top.value)}</h2>
@@ -164,6 +165,7 @@ function App() {
             key={idx}
             className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
             onClick={() => play(c, idx)}
+            disabled={!myTurn}
             draggable
             onDragStart={() => onDragStart(idx)}
             onDragOver={e => e.preventDefault()}
@@ -171,10 +173,11 @@ function App() {
             aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
           >
             {cardIcons[c.value] || c.value}
+            <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
           </button>
         ))}
       </div>
-      <button onClick={draw}>{t('draw')}</button>
+      <button onClick={draw} disabled={!myTurn}>{t('draw')}</button>
       <h3>{t('players')}</h3>
       <ul className="players">
         {state.players.map(p => (

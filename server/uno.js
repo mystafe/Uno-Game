@@ -65,15 +65,8 @@ class Game {
     return this.players[this.turn];
   }
 
-  nextTurn(extra = 0) {
+  nextTurn() {
     this.turn = (this.turn + this.direction + this.players.length) % this.players.length;
-    if (extra > 0) {
-      for (let i = 0; i < extra; i++) {
-        const player = this.players[(this.turn + this.direction * i + this.players.length) % this.players.length];
-        player.hand.push(...this.deck.splice(0, 1));
-      }
-      this.turn = (this.turn + this.direction * extra + this.players.length) % this.players.length;
-    }
   }
 
   canPlay(card) {
@@ -98,28 +91,36 @@ class Game {
     switch (card.value) {
       case 'reverse':
         this.direction *= -1;
+        this.nextTurn();
         break;
       case 'skip':
         this.nextTurn();
+        this.nextTurn();
         break;
       case 'draw2':
-        this.nextTurn(2);
+        this.nextTurn();
+        this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+        this.nextTurn();
         break;
       case 'wild4':
-        this.nextTurn(4);
+        this.nextTurn();
+        this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+        this.nextTurn();
         break;
+      default:
+        this.nextTurn();
     }
 
-    this.nextTurn();
     return true;
   }
 
   draw(id) {
-    if (!this.started) return;
+    if (!this.started) return false;
     const player = this.currentPlayer();
-    if (player.id !== id) return;
+    if (player.id !== id) return false;
     player.hand.push(this.deck.pop());
     this.nextTurn();
+    return true;
   }
 
   checkAI(io, room) {
@@ -136,24 +137,32 @@ class Game {
           switch (card.value) {
             case 'reverse':
               this.direction *= -1;
+              this.nextTurn();
               break;
             case 'skip':
               this.nextTurn();
+              this.nextTurn();
               break;
             case 'draw2':
-              this.nextTurn(2);
+              this.nextTurn();
+              this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+              this.nextTurn();
               break;
             case 'wild4':
-              this.nextTurn(4);
+              this.nextTurn();
+              this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+              this.nextTurn();
               break;
+            default:
+              this.nextTurn();
           }
           break;
         }
       }
       if (!played) {
         player.hand.push(this.deck.pop());
+        this.nextTurn();
       }
-      this.nextTurn();
       io.to(room).emit('state', this.getState());
       this.checkAI(io, room);
     }
