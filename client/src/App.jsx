@@ -127,9 +127,9 @@ function App() {
             key={idx}
             className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
             onClick={() => play(c, idx)}
-            style={{ backgroundImage: `url(/cards/${c.color}_${c.value}.svg)` }}
+            aria-label={`${c.color} ${c.value}`}
           >
-            <span className="sr-only">{c.color} {c.value}</span>
+            {c.value}
           </button>
         ))}
       </div>
