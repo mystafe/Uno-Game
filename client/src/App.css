@@ -125,3 +125,82 @@
   animation: fadeIn 0.3s ease;
   z-index: 1000;
 }
+
+.app-header, .app-footer {
+  text-align: center;
+}
+
+.app-header {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.app-title {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+
+.app-title::after {
+  content: '0.2.1';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.app-title:hover::after {
+  opacity: 1;
+}
+
+.app-footer {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.color-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 1000;
+}
+
+.color-picker .color-btn {
+  width: 50px;
+  height: 50px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.color-picker .color-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.color-picker p {
+  margin: 0 0 0.5rem;
+}
+
+.color-picker .red { background: #e74c3c; }
+.color-picker .yellow { background: #f1c40f; color: #000; }
+.color-picker .green { background: #27ae60; }
+.color-picker .blue { background: #3498db; }

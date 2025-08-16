@@ -37,6 +37,7 @@ class Game {
 
   addPlayer(id, name) {
     if (this.started || this.players.find(p => p.id === id)) return false;
+    if (this.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return false;
     this.players.push({ id, name, hand: [] });
     return true;
   }
@@ -89,7 +90,11 @@ class Game {
     if (idx === -1 || !this.canPlay(card)) return false;
 
     player.hand.splice(idx, 1);
-    this.discard.push(card);
+    if (card.color === 'wild' && card.chosenColor) {
+      this.discard.push({ color: card.chosenColor, value: card.value });
+    } else {
+      this.discard.push(card);
+    }
 
     switch (card.value) {
       case 'reverse':
@@ -135,6 +140,9 @@ class Game {
       for (let i = 0; i < player.hand.length; i++) {
         if (this.canPlay(player.hand[i])) {
           const card = player.hand.splice(i, 1)[0];
+          if (card.color === 'wild') {
+            card.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+          }
           this.discard.push(card);
           played = true;
           switch (card.value) {

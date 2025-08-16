@@ -27,6 +27,9 @@ io.on('connection', socket => {
     }
 
     const game = games[room];
+    if (game.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      return socket.emit('joinError', 'nameTaken');
+    }
     game.addPlayer(socket.id, name);
     socket.join(room);
     io.to(room).emit('state', game.getState());
