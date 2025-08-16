@@ -1,6 +1,11 @@
 .join, .lobby, .game {
   text-align: center;
   margin: 2rem;
+  padding: 2rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: fadeIn 0.6s ease;
 }
 
 .hand {
@@ -16,7 +21,8 @@
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -31,8 +37,24 @@
 .card.blue { background: #3498db; }
 .card.wild { background: #7f8c8d; }
 
+.card:hover {
+  transform: translateY(-10px) scale(1.05) rotate(-3deg);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes playCard {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-30px) scale(1.1); }
+  100% { transform: translateY(-30px) scale(1); }
+}
+
 .card.playing {
-  transform: translateY(-20px);
+  animation: playCard 0.4s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .sr-only {
@@ -49,6 +71,12 @@
 
 .players li.current {
   font-weight: bold;
+  animation: pulse 1s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 @media (max-width: 600px) {
