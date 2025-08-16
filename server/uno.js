@@ -36,10 +36,22 @@ class Game {
   }
 
   addPlayer(id, name) {
+    const existing = this.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.id = id;
+      return true;
+    }
     if (this.started || this.players.find(p => p.id === id)) return false;
-    if (this.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return false;
     this.players.push({ id, name, hand: [] });
     return true;
+  }
+
+  disconnectPlayer(id) {
+    const idx = this.players.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      this.players[idx].id = null;
+      if (this.turn === idx) this.nextTurn();
+    }
   }
 
   removePlayer(id) {
@@ -47,7 +59,7 @@ class Game {
   }
 
   isEmpty() {
-    return this.players.length === 0;
+    return this.players.every(p => !p.id);
   }
 
   start(ai = false) {
@@ -57,8 +69,8 @@ class Game {
       p.hand = this.deck.splice(0, 7);
     });
     if (ai) {
-      this.ai = { id: 'AI', name: 'Bilgisayar', hand: this.deck.splice(0, 7) };
-      this.players.push(this.ai);
+      const aiPlayer = { id: `AI-${Date.now()}`, name: 'Bilgisayar', hand: this.deck.splice(0, 7), ai: true };
+      this.players.push(aiPlayer);
     }
     this.discard = [this.deck.pop()];
     this.started = true;
@@ -131,52 +143,62 @@ class Game {
     return true;
   }
 
+  replaceWithAI(id) {
+    const player = this.players.find(p => p.id === id);
+    if (!player) return false;
+    player.id = `AI-${id}`;
+    player.name = `${player.name} (pc)`;
+    player.ai = true;
+    return true;
+  }
+
   checkAI(io, room) {
-    if (!this.ai) return;
     const player = this.currentPlayer();
-    if (player.id === 'AI') {
-      // Simple AI: play first valid card else draw
-      let played = false;
-      for (let i = 0; i < player.hand.length; i++) {
-        if (this.canPlay(player.hand[i])) {
-          const card = player.hand.splice(i, 1)[0];
-          if (card.color === 'wild') {
-            card.color = COLORS[Math.floor(Math.random() * COLORS.length)];
-          }
-          this.discard.push(card);
-          played = true;
-          switch (card.value) {
-            case 'reverse':
-              this.direction *= -1;
-              this.nextTurn();
-              break;
-            case 'skip':
-              this.nextTurn();
-              this.nextTurn();
-              break;
-            case 'draw2':
-              this.nextTurn();
-              this.currentPlayer().hand.push(...this.deck.splice(0, 2));
-              this.nextTurn();
-              break;
-            case 'wild4':
-              this.nextTurn();
-              this.currentPlayer().hand.push(...this.deck.splice(0, 4));
-              this.nextTurn();
-              break;
-            default:
-              this.nextTurn();
-          }
+    if (!player || !player.ai) return;
+    const priority = { wild4: 5, draw2: 4, skip: 3, reverse: 2, wild: 1 };
+    const playable = player.hand.filter(c => this.canPlay(c));
+    if (playable.length) {
+      playable.sort((a, b) => (priority[b.value] || 0) - (priority[a.value] || 0));
+      const card = playable[0];
+      const idx = player.hand.findIndex(c => c === card);
+      player.hand.splice(idx, 1);
+      if (card.color === 'wild') {
+        const colorCounts = COLORS.map(color => ({
+          color,
+          count: player.hand.filter(c => c.color === color).length,
+        })).sort((a, b) => b.count - a.count);
+        this.discard.push({ color: colorCounts[0].color, value: card.value });
+      } else {
+        this.discard.push(card);
+      }
+      switch (card.value) {
+        case 'reverse':
+          this.direction *= -1;
+          this.nextTurn();
           break;
-        }
+        case 'skip':
+          this.nextTurn();
+          this.nextTurn();
+          break;
+        case 'draw2':
+          this.nextTurn();
+          this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+          this.nextTurn();
+          break;
+        case 'wild4':
+          this.nextTurn();
+          this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+          this.nextTurn();
+          break;
+        default:
+          this.nextTurn();
       }
-      if (!played) {
-        player.hand.push(this.deck.pop());
-        this.nextTurn();
-      }
-      io.to(room).emit('state', this.getState());
-      this.checkAI(io, room);
+    } else {
+      player.hand.push(this.deck.pop());
+      this.nextTurn();
     }
+    io.to(room).emit('state', this.getState());
+    this.checkAI(io, room);
   }
 
   getState() {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
+import pkg from '../package.json';
 
 // Use a configurable server URL to support both local and deployed environments
 const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
@@ -33,6 +34,7 @@ const translations = {
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4' },
     viewing: 'Viewing',
     follow: 'Follow turn',
+    leave: 'Leave Game',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -60,6 +62,7 @@ const translations = {
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker' },
     viewing: 'İzlenen',
     follow: 'Sıradakini izle',
+    leave: 'Oyundan Ayrıl',
   },
 };
 
@@ -82,6 +85,7 @@ function App() {
   const [colorPicker, setColorPicker] = useState(null);
   const [watching, setWatching] = useState(null);
   const [follow, setFollow] = useState(true);
+  const [sorted, setSorted] = useState(false);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -130,21 +134,48 @@ function App() {
       if (follow) setWatching(state?.current || null);
     } else {
       const me = state?.players.find(p => p.id === id);
-      setHand(me ? [...me.hand] : []);
+      if (me) {
+        if (sorted) {
+          setHand(h => {
+            const serverHand = [...me.hand];
+            const existing = [...h];
+            const counts = serverHand.map(c => JSON.stringify(c));
+            const result = [];
+            existing.forEach(card => {
+              const key = JSON.stringify(card);
+              const idx = counts.indexOf(key);
+              if (idx !== -1) {
+                result.push(card);
+                counts[idx] = null;
+              }
+            });
+            counts.forEach((key, idx) => {
+              if (key !== null) result.push(serverHand[idx]);
+            });
+            return result;
+          });
+        } else {
+          setHand([...me.hand]);
+        }
+      }
     }
-  }, [state, id, spectator, follow]);
+  }, [state, id, spectator, follow, sorted]);
 
   const joinLobby = (r) => {
     if (!name) return;
     setRoom(r);
     socket.emit('join', { room: r, name });
+    localStorage.setItem('unoGame', JSON.stringify({ room: r, name }));
     setJoined(true);
+    setSorted(false);
   };
 
   const createLobby = () => {
     if (!name || !room) return;
     socket.emit('join', { room, name, create: true });
+    localStorage.setItem('unoGame', JSON.stringify({ room, name }));
     setJoined(true);
+    setSorted(false);
   };
 
   const start = () => {
@@ -193,6 +224,7 @@ function App() {
 
   const sortHand = () => {
     setHand(h => [...h].sort((a, b) => colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)));
+    setSorted(true);
   };
 
   const draw = () => {
@@ -214,6 +246,29 @@ function App() {
     setHand(newHand);
     setDragIndex(null);
   };
+
+  const leaveGame = () => {
+    socket.emit('leave', { room });
+    localStorage.removeItem('unoGame');
+    setJoined(false);
+    setState(null);
+    setSorted(false);
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('unoGame');
+    if (saved) {
+      try {
+        const { room: savedRoom, name: savedName } = JSON.parse(saved);
+        setName(savedName);
+        setRoom(savedRoom);
+        socket.emit('join', { room: savedRoom, name: savedName });
+        setJoined(true);
+      } catch {
+        // ignore parsing errors
+      }
+    }
+  }, []);
 
   const viewingPlayer = spectator
     ? state?.players.find(p => p.id === watching)
@@ -293,6 +348,7 @@ function App() {
           <>
             <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
             <button onClick={sortHand}>{t('sort')}</button>
+            <button onClick={leaveGame}>{t('leave')}</button>
           </>
         )}
         <h3>{t('players')}</h3>
@@ -313,7 +369,7 @@ function App() {
   return (
     <>
       <header className="app-header">
-        <h1 className="app-title" title="0.2.2">{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
+        <h1 className="app-title" data-version={pkg.version} title={pkg.version}>{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
       </header>
       {content}
       {colorPicker && (
