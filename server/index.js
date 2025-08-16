@@ -40,8 +40,7 @@ io.on('connection', socket => {
 
   socket.on('draw', ({ room }) => {
     const game = games[room];
-    if (game) {
-      game.draw(socket.id);
+    if (game && game.draw(socket.id)) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);
     }

@@ -15,6 +15,7 @@
   justify-content: center;
 }
 
+
 .card {
   width: 80px;
   height: 120px;
@@ -29,6 +30,7 @@
   font-size: 2.5rem;
   font-weight: bold;
   color: #fff;
+  position: relative;
 }
 
 .card.red { background: #e74c3c; }
@@ -37,9 +39,35 @@
 .card.blue { background: #3498db; }
 .card.wild { background: #7f8c8d; }
 
-.card:hover {
+.card:hover:not(:disabled) {
   transform: translateY(-10px) scale(1.05) rotate(-3deg);
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+}
+
+.card:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.card .tooltip {
+  visibility: hidden;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  position: absolute;
+  bottom: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.card:hover .tooltip {
+  visibility: visible;
 }
 
 @keyframes playCard {
