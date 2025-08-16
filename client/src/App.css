@@ -1,0 +1,24 @@
+.join, .lobby, .game {
+  text-align: center;
+  margin: 2rem;
+}
+
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.card {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
+
+.card.red { background: #e74c3c; }
+.card.yellow { background: #f1c40f; color: black; }
+.card.green { background: #27ae60; }
+.card.blue { background: #3498db; }
+.card.wild { background: #7f8c8d; }
