@@ -75,7 +75,7 @@ function App() {
     setTimeout(() => {
       socket.emit('play', { room, card });
       setPlayingIndex(null);
-    }, 300);
+    }, 400);
   };
 
   const draw = () => {
