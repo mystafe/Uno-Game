@@ -11,21 +11,33 @@ const io = new Server(server, {
 
 const games = {};
 
+const getLobbies = () =>
+  Object.entries(games).map(([name, game]) => ({ name, started: game.started }));
+
 io.on('connection', socket => {
-  socket.on('join', ({ room, name }) => {
-    if (!games[room]) {
+  // send current lobbies on connect
+  socket.emit('lobbies', getLobbies());
+
+  socket.on('join', ({ room, name, create }) => {
+    if (create) {
+      if (games[room]) return socket.emit('joinError', 'exists');
       games[room] = new Game(room);
+    } else if (!games[room]) {
+      return socket.emit('joinError', 'notfound');
     }
-    games[room].addPlayer(socket.id, name);
+
+    const game = games[room];
+    game.addPlayer(socket.id, name);
     socket.join(room);
-    io.to(room).emit('state', games[room].getState());
+    io.to(room).emit('state', game.getState());
+    io.emit('lobbies', getLobbies());
   });
 
   socket.on('start', ({ room, ai }) => {
     const game = games[room];
-    if (game) {
-      game.start(ai);
+    if (game && game.start(ai)) {
       io.to(room).emit('state', game.getState());
+      io.emit('lobbies', getLobbies());
       game.checkAI(io, room);
     }
   });
@@ -56,6 +68,7 @@ io.on('connection', socket => {
         io.to(room).emit('state', game.getState());
       }
     });
+    io.emit('lobbies', getLobbies());
   });
 });
 

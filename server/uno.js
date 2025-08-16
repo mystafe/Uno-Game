@@ -36,8 +36,9 @@ class Game {
   }
 
   addPlayer(id, name) {
-    if (this.started) return;
+    if (this.started || this.players.find(p => p.id === id)) return false;
     this.players.push({ id, name, hand: [] });
+    return true;
   }
 
   removePlayer(id) {
@@ -49,6 +50,7 @@ class Game {
   }
 
   start(ai = false) {
+    if (this.players.length < 2 && !ai) return false;
     this.deck = createDeck();
     this.players.forEach(p => {
       p.hand = this.deck.splice(0, 7);
@@ -59,6 +61,7 @@ class Game {
     }
     this.discard = [this.deck.pop()];
     this.started = true;
+    return true;
   }
 
   currentPlayer() {
