@@ -54,7 +54,7 @@ class Game {
       p.hand = this.deck.splice(0, 7);
     });
     if (ai) {
-      this.ai = { id: 'AI', name: 'Computer', hand: this.deck.splice(0, 7) };
+      this.ai = { id: 'AI', name: 'Bilgisayar', hand: this.deck.splice(0, 7) };
       this.players.push(this.ai);
     }
     this.discard = [this.deck.pop()];
