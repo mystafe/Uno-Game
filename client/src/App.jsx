@@ -31,6 +31,8 @@ const translations = {
     sort: 'Sort Cards',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4' },
+    viewing: 'Viewing',
+    follow: 'Follow turn',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -56,6 +58,8 @@ const translations = {
     sort: 'Kartları sırala',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker' },
+    viewing: 'İzlenen',
+    follow: 'Sıradakini izle',
   },
 };
 
@@ -76,8 +80,11 @@ function App() {
   const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
   const COLORS = ['red', 'yellow', 'green', 'blue'];
   const [colorPicker, setColorPicker] = useState(null);
+  const [watching, setWatching] = useState(null);
+  const [follow, setFollow] = useState(true);
 
   const myTurn = state?.current === id;
+  const spectator = state ? !state.players.some(p => p.id === id) : false;
 
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
   const colorText = (color) => translations[lang].colors[color] || color;
@@ -119,9 +126,13 @@ function App() {
   }, [lang, t]);
 
   useEffect(() => {
-    const me = state?.players.find(p => p.id === id);
-    setHand(me ? [...me.hand] : []);
-  }, [state, id]);
+    if (spectator) {
+      if (follow) setWatching(state?.current || null);
+    } else {
+      const me = state?.players.find(p => p.id === id);
+      setHand(me ? [...me.hand] : []);
+    }
+  }, [state, id, spectator, follow]);
 
   const joinLobby = (r) => {
     if (!name) return;
@@ -204,6 +215,11 @@ function App() {
     setDragIndex(null);
   };
 
+  const viewingPlayer = spectator
+    ? state?.players.find(p => p.id === watching)
+    : state?.players.find(p => p.id === id);
+  const displayHand = spectator ? viewingPlayer?.hand || [] : hand;
+
   let content;
   if (!joined) {
     content = (
@@ -247,18 +263,25 @@ function App() {
       <div className="game">
         <h2>{t('topCard')}: {colorText(state.top.color)} {displayValue(state.top.value)}</h2>
         <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
-        <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
+        {spectator ? (
+          <>
+            <h3>{t('viewing')}: {viewingPlayer?.name}</h3>
+            {!follow && <button onClick={() => setFollow(true)}>{t('follow')}</button>}
+          </>
+        ) : (
+          <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
+        )}
         <div className="hand">
-          {hand.map((c, idx) => (
+          {displayHand.map((c, idx) => (
             <button
               key={idx}
               className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
-              onClick={() => play(c, idx)}
-              disabled={!myTurn || actionPending}
-              draggable
-              onDragStart={() => onDragStart(idx)}
-              onDragOver={e => e.preventDefault()}
-              onDrop={() => onDrop(idx)}
+              onClick={spectator ? undefined : () => play(c, idx)}
+              disabled={spectator || !myTurn || actionPending}
+              draggable={!spectator}
+              onDragStart={spectator ? undefined : () => onDragStart(idx)}
+              onDragOver={spectator ? undefined : e => e.preventDefault()}
+              onDrop={spectator ? undefined : () => onDrop(idx)}
               aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
             >
               {cardIcons[c.value] || c.value}
@@ -266,12 +289,20 @@ function App() {
             </button>
           ))}
         </div>
-        <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
-        <button onClick={sortHand}>{t('sort')}</button>
+        {!spectator && (
+          <>
+            <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
+            <button onClick={sortHand}>{t('sort')}</button>
+          </>
+        )}
         <h3>{t('players')}</h3>
         <ul className="players">
           {state.players.map(p => (
-            <li key={p.id} className={state.current === p.id ? 'current' : ''}>
+            <li
+              key={p.id}
+              className={`${state.current === p.id ? 'current' : ''} ${spectator && watching === p.id ? 'watching' : ''}`}
+              onClick={spectator ? () => { setWatching(p.id); setFollow(false); } : undefined}
+            >
               {p.name}: {p.hand.length} {t('cards')}
             </li>
           ))}
@@ -282,7 +313,7 @@ function App() {
   return (
     <>
       <header className="app-header">
-        <h1 className="app-title" title="0.2.1">{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
+        <h1 className="app-title" title="0.2.2">{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
       </header>
       {content}
       {colorPicker && (
