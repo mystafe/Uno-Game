@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const Game = require('./uno');
+const { version } = require('./package.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,10 +28,13 @@ io.on('connection', socket => {
     }
 
     const game = games[room];
-    if (game.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    const existing = game.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing && existing.id) {
       return socket.emit('joinError', 'nameTaken');
     }
-    game.addPlayer(socket.id, name);
+    if (!game.addPlayer(socket.id, name)) {
+      return socket.emit('joinError', 'notfound');
+    }
     socket.join(room);
     io.to(room).emit('state', game.getState());
     io.emit('lobbies', getLobbies());
@@ -61,14 +65,25 @@ io.on('connection', socket => {
     }
   });
 
+  socket.on('leave', ({ room }) => {
+    const game = games[room];
+    if (game && game.replaceWithAI(socket.id)) {
+      socket.leave(room);
+      io.to(room).emit('state', game.getState());
+      game.checkAI(io, room);
+    }
+    io.emit('lobbies', getLobbies());
+  });
+
   socket.on('disconnect', () => {
     Object.keys(games).forEach(room => {
       const game = games[room];
-      game.removePlayer(socket.id);
+      game.disconnectPlayer(socket.id);
       if (game.isEmpty()) {
         delete games[room];
       } else {
         io.to(room).emit('state', game.getState());
+        game.checkAI(io, room);
       }
     });
     io.emit('lobbies', getLobbies());
@@ -76,4 +91,4 @@ io.on('connection', socket => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+server.listen(PORT, () => console.log(`Server v${version} listening on ${PORT}`));
