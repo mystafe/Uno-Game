@@ -56,6 +56,8 @@ function App() {
   const [playingIndex, setPlayingIndex] = useState(null);
   const [hand, setHand] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
+  const [lobbies, setLobbies] = useState([]);
+  const [error, setError] = useState('');
 
   const myTurn = state?.current === id;
 
@@ -74,9 +76,16 @@ function App() {
   useEffect(() => {
     socket.on('connect', () => setId(socket.id));
     socket.on('state', st => setState(st));
+    socket.on('lobbies', setLobbies);
+    socket.on('joinError', msg => {
+      setError(msg);
+      setJoined(false);
+    });
     return () => {
       socket.off('connect');
       socket.off('state');
+      socket.off('lobbies');
+      socket.off('joinError');
     };
   }, []);
 
@@ -85,9 +94,16 @@ function App() {
     setHand(me ? [...me.hand] : []);
   }, [state, id]);
 
-  const join = () => {
+  const joinLobby = (r) => {
     if (!name) return;
-    socket.emit('join', { room, name });
+    setRoom(r);
+    socket.emit('join', { room: r, name });
+    setJoined(true);
+  };
+
+  const createLobby = () => {
+    if (!name || !room) return;
+    socket.emit('join', { room, name, create: true });
     setJoined(true);
   };
 
@@ -132,13 +148,20 @@ function App() {
           <option value="en">İngilizce</option>
         </select>
         <h2>{t('joinGame')}</h2>
+        {error && <div className="error">{error}</div>}
         <input placeholder={t('name')} value={name} onChange={e => setName(e.target.value)} />
+        <h3>Aktif Lobbiler</h3>
+        <ul className="lobbies">
+          {lobbies.map(l => (
+            <li key={l.name}>
+              {l.name} {l.started ? '(başladı)' : ''}
+              <button onClick={() => joinLobby(l.name)}>{l.started ? 'İzle' : 'Katıl'}</button>
+            </li>
+          ))}
+        </ul>
+        <h3>Yeni Lobby</h3>
         <input placeholder={t('room')} value={room} onChange={e => setRoom(e.target.value)} />
-        <label>
-          <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
-          {t('addComputer')}
-        </label>
-        <button onClick={join}>{t('join')}</button>
+        <button onClick={createLobby}>Oluştur</button>
       </div>
     );
   }
@@ -150,6 +173,10 @@ function App() {
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
         </ul>
+        <label>
+          <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
+          {t('addComputer')}
+        </label>
         <button onClick={start}>{t('start')}</button>
       </div>
     );
