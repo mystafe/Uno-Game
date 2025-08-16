@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 
@@ -26,6 +26,9 @@ const translations = {
     roomNotFound: 'Room not found',
     invalidMove: 'Invalid move',
     notYourTurn: 'Not your turn',
+    nameTaken: 'Name already used',
+    chooseColor: 'Choose a color',
+    sort: 'Sort Cards',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4' },
   },
@@ -48,6 +51,9 @@ const translations = {
     roomNotFound: 'Oda bulunamadı',
     invalidMove: 'Geçersiz hamle',
     notYourTurn: 'Sıra sizde değil',
+    nameTaken: 'Bu isim zaten kullanılıyor',
+    chooseColor: 'Renk seçin',
+    sort: 'Kartları sırala',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker' },
   },
@@ -67,10 +73,13 @@ function App() {
   const [lobbies, setLobbies] = useState([]);
   const [toast, setToast] = useState('');
   const [actionPending, setActionPending] = useState(false);
+  const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
+  const COLORS = ['red', 'yellow', 'green', 'blue'];
+  const [colorPicker, setColorPicker] = useState(null);
 
   const myTurn = state?.current === id;
 
-  const t = (key) => translations[lang][key] || key;
+  const t = useCallback((key) => translations[lang][key] || key, [lang]);
   const colorText = (color) => translations[lang].colors[color] || color;
   const valueText = (value) => translations[lang].values[value] || value;
   const cardIcons = {
@@ -88,23 +97,26 @@ function App() {
   };
 
   useEffect(() => {
+    const joinErrorHandler = msg => {
+      if (msg === 'exists') showToast(t('roomExists'));
+      else if (msg === 'nameTaken') showToast(t('nameTaken'));
+      else showToast(t('roomNotFound'));
+      setJoined(false);
+    };
     socket.on('connect', () => setId(socket.id));
     socket.on('state', st => {
       setState(st);
       setActionPending(false);
     });
     socket.on('lobbies', setLobbies);
-    socket.on('joinError', msg => {
-      showToast(msg === 'exists' ? t('roomExists') : t('roomNotFound'));
-      setJoined(false);
-    });
+    socket.on('joinError', joinErrorHandler);
     return () => {
       socket.off('connect');
       socket.off('state');
       socket.off('lobbies');
-      socket.off('joinError');
+      socket.off('joinError', joinErrorHandler);
     };
-  }, []);
+  }, [lang, t]);
 
   useEffect(() => {
     const me = state?.players.find(p => p.id === id);
@@ -128,6 +140,20 @@ function App() {
     socket.emit('start', { room, ai });
   };
 
+  const performPlay = (card, idx) => {
+    setActionPending(true);
+    setPlayingIndex(idx);
+    setHand(h => {
+      const newHand = [...h];
+      newHand.splice(idx, 1);
+      return newHand;
+    });
+    setTimeout(() => {
+      socket.emit('play', { room, card });
+      setPlayingIndex(null);
+    }, 400);
+  };
+
   const play = (card, idx) => {
     if (!myTurn) {
       showToast(t('notYourTurn'));
@@ -140,17 +166,22 @@ function App() {
       showToast(t('invalidMove'));
       return;
     }
-    setActionPending(true);
-    setPlayingIndex(idx);
-    setHand(h => {
-      const newHand = [...h];
-      newHand.splice(idx, 1);
-      return newHand;
-    });
-    setTimeout(() => {
-      socket.emit('play', { room, card });
-      setPlayingIndex(null);
-    }, 400);
+    if (card.color === 'wild') {
+      setColorPicker({ card, idx });
+      return;
+    }
+    performPlay(card, idx);
+  };
+
+  const chooseColor = (color) => {
+    if (!colorPicker) return;
+    const { card, idx } = colorPicker;
+    setColorPicker(null);
+    performPlay({ ...card, chosenColor: color }, idx);
+  };
+
+  const sortHand = () => {
+    setHand(h => [...h].sort((a, b) => colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)));
   };
 
   const draw = () => {
@@ -236,6 +267,7 @@ function App() {
           ))}
         </div>
         <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
+        <button onClick={sortHand}>{t('sort')}</button>
         <h3>{t('players')}</h3>
         <ul className="players">
           {state.players.map(p => (
@@ -249,8 +281,24 @@ function App() {
   }
   return (
     <>
+      <header className="app-header">
+        <h1 className="app-title" title="0.2.1">{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
+      </header>
       {content}
+      {colorPicker && (
+        <div className="color-picker">
+          <p>{t('chooseColor')}</p>
+          <div className="color-options">
+            {COLORS.map(c => (
+              <button key={c} className={`color-btn ${c}`} onClick={() => chooseColor(c)}>
+                {colorText(c)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {toast && <div className="toast">{toast}</div>}
+      <footer className="app-footer">Mustafa Evleksiz tarafından geliştirilmiştir</footer>
     </>
   );
 }
