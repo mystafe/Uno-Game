@@ -22,11 +22,11 @@ npm run dev
 ```
 İstemci varsayılan olarak `http://localhost:3001` adresine bağlanır.
 
-## Netlify'ya Deploy
-1. `client` klasörünü Netlify sitesine deploy edin.
+## Vercel'de Deploy
+1. `client` klasörünü Vercel üzerinde yayınlayın.
    - Build komutu: `npm run build`
    - Yayın klasörü: `dist`
-2. Netlify ortam değişkenlerine `VITE_SERVER_URL` olarak Socket.IO sunucunuzun URL'sini ekleyin.
+2. Vercel ortam değişkenlerine `VITE_SERVER_URL` olarak Socket.IO sunucunuzun URL'sini ekleyin (örneğin `https://uno-game-backend-bco7.onrender.com`).
 3. `server` klasörünü kalıcı bir Node.js barındırma servisine (Render, Heroku vb.) ayrı olarak deploy edin.
 
 Güle güle UNO oynayın!

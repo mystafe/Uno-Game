@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 
-const socket = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
+// Use a configurable server URL to support both local and deployed environments
+const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const socket = io(serverUrl);
 
 const translations = {
   en: {
