@@ -33,6 +33,7 @@ class Game {
     this.discard = [];
     this.deck = [];
     this.ai = null;
+    this.winner = null;
   }
 
   addPlayer(id, name) {
@@ -74,6 +75,7 @@ class Game {
     }
     this.discard = [this.deck.pop()];
     this.started = true;
+    this.winner = null;
     return true;
   }
 
@@ -106,6 +108,12 @@ class Game {
       this.discard.push({ color: card.chosenColor, value: card.value });
     } else {
       this.discard.push(card);
+    }
+
+    if (player.hand.length === 0) {
+      this.started = false;
+      this.winner = player.id;
+      return true;
     }
 
     switch (card.value) {
@@ -171,34 +179,39 @@ class Game {
       } else {
         this.discard.push(card);
       }
-      switch (card.value) {
-        case 'reverse':
-          this.direction *= -1;
-          this.nextTurn();
-          break;
-        case 'skip':
-          this.nextTurn();
-          this.nextTurn();
-          break;
-        case 'draw2':
-          this.nextTurn();
-          this.currentPlayer().hand.push(...this.deck.splice(0, 2));
-          this.nextTurn();
-          break;
-        case 'wild4':
-          this.nextTurn();
-          this.currentPlayer().hand.push(...this.deck.splice(0, 4));
-          this.nextTurn();
-          break;
-        default:
-          this.nextTurn();
+      if (player.hand.length === 0) {
+        this.started = false;
+        this.winner = player.id;
+      } else {
+        switch (card.value) {
+          case 'reverse':
+            this.direction *= -1;
+            this.nextTurn();
+            break;
+          case 'skip':
+            this.nextTurn();
+            this.nextTurn();
+            break;
+          case 'draw2':
+            this.nextTurn();
+            this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+            this.nextTurn();
+            break;
+          case 'wild4':
+            this.nextTurn();
+            this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+            this.nextTurn();
+            break;
+          default:
+            this.nextTurn();
+        }
       }
     } else {
       player.hand.push(this.deck.pop());
       this.nextTurn();
     }
     io.to(room).emit('state', this.getState());
-    this.checkAI(io, room);
+    if (this.started) this.checkAI(io, room);
   }
 
   getState() {
@@ -206,7 +219,8 @@ class Game {
       started: this.started,
       players: this.players.map(p => ({ id: p.id, name: p.name, hand: p.hand })),
       current: this.currentPlayer() ? this.currentPlayer().id : null,
-      top: this.discard[this.discard.length - 1]
+      top: this.discard[this.discard.length - 1],
+      winner: this.winner
     };
   }
 }

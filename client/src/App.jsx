@@ -35,6 +35,15 @@ const translations = {
     viewing: 'Viewing',
     follow: 'Follow turn',
     leave: 'Leave Game',
+    started: 'started',
+    watch: 'Watch',
+    newLobby: 'New Lobby',
+    create: 'Create',
+    developedBy: 'Developed by Mustafa Evleksiz',
+    english: 'English',
+    turkish: 'Turkish',
+    winner: 'Winner',
+    activeLobbies: 'Active Lobbies',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -63,6 +72,15 @@ const translations = {
     viewing: 'İzlenen',
     follow: 'Sıradakini izle',
     leave: 'Oyundan Ayrıl',
+    started: 'başladı',
+    watch: 'İzle',
+    newLobby: 'Yeni Lobby',
+    create: 'Oluştur',
+    developedBy: 'Mustafa Evleksiz tarafından geliştirilmiştir',
+    english: 'İngilizce',
+    turkish: 'Türkçe',
+    winner: 'Kazanan',
+    activeLobbies: 'Aktif Lobbiler',
   },
 };
 
@@ -280,29 +298,30 @@ function App() {
     content = (
       <div className="join">
         <select className="lang-select" value={lang} onChange={e => setLang(e.target.value)}>
-          <option value="tr">Türkçe</option>
-          <option value="en">İngilizce</option>
+          <option value="tr">{t('turkish')}</option>
+          <option value="en">{t('english')}</option>
         </select>
         <h2>{t('joinGame')}</h2>
         <input placeholder={t('name')} value={name} onChange={e => setName(e.target.value)} />
-        <h3>Aktif Lobbiler</h3>
+        <h3>{t('activeLobbies')}</h3>
         <ul className="lobbies">
           {lobbies.map(l => (
             <li key={l.name}>
-              {l.name} {l.started ? '(başladı)' : ''}
-              <button onClick={() => joinLobby(l.name)}>{l.started ? 'İzle' : 'Katıl'}</button>
+              {l.name} {l.started ? `(${t('started')})` : ''}
+              <button onClick={() => joinLobby(l.name)}>{l.started ? t('watch') : t('join')}</button>
             </li>
           ))}
         </ul>
-        <h3>Yeni Lobby</h3>
+        <h3>{t('newLobby')}</h3>
         <input placeholder={t('room')} value={room} onChange={e => setRoom(e.target.value)} />
-        <button onClick={createLobby}>Oluştur</button>
+        <button onClick={createLobby}>{t('create')}</button>
       </div>
     );
   } else if (!state || !state.started) {
     content = (
       <div className="lobby">
         <h2>{t('roomHeading')}: {room}</h2>
+        {state?.winner && <h3>{t('winner')}: {state.players.find(p => p.id === state.winner)?.name}</h3>}
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
         </ul>
@@ -385,7 +404,7 @@ function App() {
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
-      <footer className="app-footer">Mustafa Evleksiz tarafından geliştirilmiştir</footer>
+      <footer className="app-footer">{t('developedBy')}</footer>
     </>
   );
 }
