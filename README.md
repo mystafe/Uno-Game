@@ -1,11 +1,11 @@
 # Uno Game
 
 Basit kurallarla UNO oyunu. Oyuncular aynı odada toplanıp Socket.IO ile gerçek zamanlı oynayabilir.
-İsteğe bağlı olarak bilgisayar (AI) oyuncusu eklenebilir.
+İsteğe bağlı olarak AI oyuncusu eklenebilir.
 
 ## Özellikler
 - Birden fazla oyuncu aynı anda oynayabilir.
-- Bilgisayara karşı oynama seçeneği.
+- AI'ye karşı oynama seçeneği.
 - Sayı, renk, atla, ters çevir, +2, joker ve +4 kartları.
 
 ## Yerelde Çalıştırma

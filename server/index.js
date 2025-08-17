@@ -86,11 +86,11 @@ io.on('connection', socket => {
 
   socket.on('kick', ({ room, target }) => {
     const game = games[room];
-    if (game) {
-      game.removePlayer(target);
+    if (game && game.replaceWithAI(target)) {
       const targetSocket = io.sockets.sockets.get(target);
       if (targetSocket) targetSocket.leave(room);
       io.to(room).emit('state', game.getState());
+      game.checkAI(io, room);
       if (!game.started) io.emit('lobbies', getLobbies());
     }
   });

@@ -127,7 +127,33 @@
 }
 
 .card.drawn {
-  animation: drawCard 0.5s ease;
+  animation: drawCard 0.5s ease, newCardPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes newCardPulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+  }
+  to {
+    box-shadow: 0 0 10px 4px rgba(255, 215, 0, 0);
+  }
+}
+
+.card .new-banner {
+  display: none;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: gold;
+  color: #000;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.card.drawn .new-banner {
+  display: block;
 }
 
 @keyframes flipCard {
@@ -316,17 +342,6 @@
 .game-actions .leave-btn {
   font-size: 0.9rem;
   margin-left: 0;
-}
-
-.new-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #e74c3c;
-  color: #fff;
-  font-size: 0.5rem;
-  padding: 2px 4px;
-  border-radius: 3px;
 }
 
 .chat-toggle {

@@ -40,7 +40,7 @@ class Game {
   }
 
   nextAIName() {
-    const base = 'Bilgisayar';
+    const base = 'AI oyuncu';
     const names = this.players.map(p => p.name).filter(n => n.startsWith(base));
     if (!names.length) return base;
     let n = 2;
@@ -242,7 +242,7 @@ class Game {
     const player = this.players.find(p => p.id === id);
     if (!player) return false;
     player.id = `AI-${id}`;
-    player.name = this.nextAIName();
+    player.name = `${player.name} (AI)`;
     player.ai = true;
     return true;
   }
