@@ -9,7 +9,7 @@ function createDeck() {
     SPECIALS.forEach(type => deck.push({ color, value: type }));
   });
   // Add wild cards
-  ['wild', 'wild4'].forEach(type => {
+  ['wild', 'wild4', 'swap'].forEach(type => {
     for (let i = 0; i < 4; i++) deck.push({ color: 'wild', value: type });
   });
   return shuffle(deck);
@@ -73,7 +73,12 @@ class Game {
       const aiPlayer = { id: `AI-${Date.now()}`, name: 'Bilgisayar', hand: this.deck.splice(0, 7), ai: true };
       this.players.push(aiPlayer);
     }
-    this.discard = [this.deck.pop()];
+    let first = this.drawCard();
+    while (first.color === 'wild' || typeof first.value !== 'number') {
+      this.deck.unshift(first);
+      first = this.drawCard();
+    }
+    this.discard = [first];
     this.started = true;
     this.winner = null;
     return true;
@@ -88,6 +93,7 @@ class Game {
   }
 
   canPlay(card) {
+    if (!card) return false;
     const top = this.discard[this.discard.length - 1];
     return (
       card.color === 'wild' ||
@@ -96,7 +102,16 @@ class Game {
     );
   }
 
-  play(id, card) {
+  drawCard() {
+    if (this.deck.length === 0) {
+      const top = this.discard.pop();
+      this.deck = shuffle(this.discard);
+      this.discard = [top];
+    }
+    return this.deck.pop();
+  }
+
+  play(id, card, target) {
     if (!this.started) return false;
     const player = this.currentPlayer();
     if (player.id !== id) return false;
@@ -127,12 +142,19 @@ class Game {
         break;
       case 'draw2':
         this.nextTurn();
-        this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+        this.currentPlayer().hand.push(this.drawCard(), this.drawCard());
         this.nextTurn();
         break;
       case 'wild4':
         this.nextTurn();
-        this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+        this.currentPlayer().hand.push(this.drawCard(), this.drawCard(), this.drawCard(), this.drawCard());
+        this.nextTurn();
+        break;
+      case 'swap':
+        if (target) {
+          const other = this.players.find(p => p.id === target);
+          if (other) [player.hand, other.hand] = [other.hand, player.hand];
+        }
         this.nextTurn();
         break;
       default:
@@ -146,7 +168,7 @@ class Game {
     if (!this.started) return false;
     const player = this.currentPlayer();
     if (player.id !== id) return false;
-    player.hand.push(this.deck.pop());
+    player.hand.push(this.drawCard());
     this.nextTurn();
     return true;
   }
@@ -163,8 +185,8 @@ class Game {
   checkAI(io, room) {
     const player = this.currentPlayer();
     if (!player || !player.ai) return;
-    const priority = { wild4: 5, draw2: 4, skip: 3, reverse: 2, wild: 1 };
-    const playable = player.hand.filter(c => this.canPlay(c));
+    const priority = { wild4: 5, draw2: 4, skip: 3, reverse: 2, swap: 2, wild: 1 };
+    const playable = player.hand.filter(c => c && this.canPlay(c));
     if (playable.length) {
       playable.sort((a, b) => (priority[b.value] || 0) - (priority[a.value] || 0));
       const card = playable[0];
@@ -194,12 +216,17 @@ class Game {
             break;
           case 'draw2':
             this.nextTurn();
-            this.currentPlayer().hand.push(...this.deck.splice(0, 2));
+            this.currentPlayer().hand.push(this.drawCard(), this.drawCard());
             this.nextTurn();
             break;
           case 'wild4':
             this.nextTurn();
-            this.currentPlayer().hand.push(...this.deck.splice(0, 4));
+            this.currentPlayer().hand.push(this.drawCard(), this.drawCard(), this.drawCard(), this.drawCard());
+            this.nextTurn();
+            break;
+          case 'swap':
+            const target = this.players.filter(p => p.id !== player.id).sort((a, b) => b.hand.length - a.hand.length)[0];
+            if (target) [player.hand, target.hand] = [target.hand, player.hand];
             this.nextTurn();
             break;
           default:
@@ -207,7 +234,7 @@ class Game {
         }
       }
     } else {
-      player.hand.push(this.deck.pop());
+      player.hand.push(this.drawCard());
       this.nextTurn();
     }
     io.to(room).emit('state', this.getState());

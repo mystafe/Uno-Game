@@ -49,9 +49,9 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('play', ({ room, card }) => {
+  socket.on('play', ({ room, card, target }) => {
     const game = games[room];
-    if (game && game.play(socket.id, card)) {
+    if (game && game.play(socket.id, card, target)) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);
       if (!game.started) io.emit('lobbies', getLobbies());

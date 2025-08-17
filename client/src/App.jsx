@@ -31,7 +31,7 @@ const translations = {
     chooseColor: 'Choose a color',
     sort: 'Sort Cards',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
-    values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4' },
+    values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4', swap: 'Swap Hands' },
     viewing: 'Viewing',
     follow: 'Follow turn',
     leave: 'Leave Game',
@@ -43,6 +43,8 @@ const translations = {
     english: 'English',
     turkish: 'Turkish',
     winner: 'Winner',
+    wins: 'wins!',
+    choosePlayer: 'Choose a player',
     activeLobbies: 'Active Lobbies',
   },
   tr: {
@@ -68,7 +70,7 @@ const translations = {
     chooseColor: 'Renk seçin',
     sort: 'Kartları sırala',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
-    values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker' },
+    values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker', swap: 'El Değiştir' },
     viewing: 'İzlenen',
     follow: 'Sıradakini izle',
     leave: 'Oyundan Ayrıl',
@@ -80,6 +82,8 @@ const translations = {
     english: 'İngilizce',
     turkish: 'Türkçe',
     winner: 'Kazanan',
+    wins: 'kazandı!',
+    choosePlayer: 'Bir oyuncu seçin',
     activeLobbies: 'Aktif Lobbiler',
   },
 };
@@ -101,6 +105,7 @@ function App() {
   const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
   const COLORS = ['red', 'yellow', 'green', 'blue'];
   const [colorPicker, setColorPicker] = useState(null);
+  const [swapPicker, setSwapPicker] = useState(null);
   const [watching, setWatching] = useState(null);
   const [follow, setFollow] = useState(true);
   const [sorted, setSorted] = useState(false);
@@ -117,6 +122,7 @@ function App() {
     draw2: '+2',
     wild: '🌈',
     wild4: '🌈+4',
+    swap: '🔄',
   };
   const displayValue = (val) => cardIcons[val] ? `${cardIcons[val]} ${valueText(val)}` : valueText(val);
 
@@ -200,7 +206,7 @@ function App() {
     socket.emit('start', { room, ai });
   };
 
-  const performPlay = (card, idx) => {
+  const performPlay = (card, idx, target) => {
     setActionPending(true);
     setPlayingIndex(idx);
     setHand(h => {
@@ -209,7 +215,7 @@ function App() {
       return newHand;
     });
     setTimeout(() => {
-      socket.emit('play', { room, card });
+      socket.emit('play', { room, card, target });
       setPlayingIndex(null);
     }, 400);
   };
@@ -237,7 +243,18 @@ function App() {
     if (!colorPicker) return;
     const { card, idx } = colorPicker;
     setColorPicker(null);
-    performPlay({ ...card, chosenColor: color }, idx);
+    if (card.value === 'swap') {
+      setSwapPicker({ card: { ...card, chosenColor: color }, idx });
+    } else {
+      performPlay({ ...card, chosenColor: color }, idx);
+    }
+  };
+
+  const chooseSwapTarget = (targetId) => {
+    if (!swapPicker) return;
+    const { card, idx } = swapPicker;
+    setSwapPicker(null);
+    performPlay(card, idx, targetId);
   };
 
   const sortHand = () => {
@@ -335,7 +352,16 @@ function App() {
   } else {
     content = (
       <div className="game">
-        <h2>{t('topCard')}: {colorText(state.top.color)} {displayValue(state.top.value)}</h2>
+        <div className="top-area">
+          <h2>{t('topCard')}</h2>
+          <div
+            className={`card ${state.top.color} small`}
+            aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
+          >
+            {cardIcons[state.top.value] || state.top.value}
+          </div>
+          <span className="top-label">{colorText(state.top.color)} {displayValue(state.top.value)}</span>
+        </div>
         <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
         {spectator ? (
           <>
@@ -401,6 +427,21 @@ function App() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+      {swapPicker && (
+        <div className="color-picker player-picker">
+          <p>{t('choosePlayer')}</p>
+          <div className="player-options">
+            {state.players.filter(p => p.id !== id).map(p => (
+              <button key={p.id} onClick={() => chooseSwapTarget(p.id)}>{p.name}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {state?.winner && (
+        <div className="winner-banner">
+          {state.players.find(p => p.id === state.winner)?.name} {t('wins')}
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}

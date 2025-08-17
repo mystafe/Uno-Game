@@ -41,6 +41,25 @@
 .card.blue { background: #3498db; }
 .card.wild { background: #7f8c8d; }
 
+.card.small {
+  width: 40px;
+  height: 60px;
+  font-size: 1.2rem;
+  cursor: default;
+}
+
+.top-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.top-label {
+  font-size: 0.9rem;
+}
+
 .card:hover:not(:disabled) {
   transform: translateY(-10px) scale(1.05) rotate(-3deg);
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
@@ -218,3 +237,36 @@
 .color-picker .yellow { background: #f1c40f; color: #000; }
 .color-picker .green { background: #27ae60; }
 .color-picker .blue { background: #3498db; }
+
+.player-picker .player-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.player-picker button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.winner-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 2rem 3rem;
+  border-radius: 12px;
+  font-size: 2rem;
+  animation: winnerPop 1s ease forwards;
+  z-index: 1000;
+}
+
+@keyframes winnerPop {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  60% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
