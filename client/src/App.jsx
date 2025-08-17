@@ -30,6 +30,7 @@ const translations = {
     nameTaken: 'Name already used',
     chooseColor: 'Choose a color',
     sort: 'Sort Cards',
+    noSpecialFinish: 'You cannot finish with a special card',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4', swap: 'Swap Hands' },
     viewing: 'Viewing',
@@ -69,6 +70,7 @@ const translations = {
     nameTaken: 'Bu isim zaten kullanılıyor',
     chooseColor: 'Renk seçin',
     sort: 'Kartları sırala',
+    noSpecialFinish: 'Özel kart ile oyunu bitiremezsiniz',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker', swap: 'El Değiştir' },
     viewing: 'İzlenen',
@@ -145,11 +147,18 @@ function App() {
     });
     socket.on('lobbies', setLobbies);
     socket.on('joinError', joinErrorHandler);
+    const actionErrorHandler = msg => {
+      if (msg === 'specialFinish') showToast(t('noSpecialFinish'));
+      else showToast(t('invalidMove'));
+      setActionPending(false);
+    };
+    socket.on('actionError', actionErrorHandler);
     return () => {
       socket.off('connect');
       socket.off('state');
       socket.off('lobbies');
       socket.off('joinError', joinErrorHandler);
+      socket.off('actionError', actionErrorHandler);
     };
   }, [lang, t]);
 
@@ -230,6 +239,10 @@ function App() {
     const canPlay = card.color === 'wild' || card.color === top.color || card.value === top.value;
     if (!canPlay) {
       showToast(t('invalidMove'));
+      return;
+    }
+    if (hand.length === 1 && typeof card.value !== 'number') {
+      showToast(t('noSpecialFinish'));
       return;
     }
     if (card.color === 'wild') {
@@ -390,11 +403,11 @@ function App() {
           ))}
         </div>
         {!spectator && (
-          <>
-            <button onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
-            <button onClick={sortHand}>{t('sort')}</button>
-            <button onClick={leaveGame}>{t('leave')}</button>
-          </>
+          <div className="game-actions">
+            <button className="draw-btn" onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
+            <button className="sort-btn" onClick={sortHand}>{t('sort')}</button>
+            <button className="leave-btn" onClick={leaveGame}>{t('leave')}</button>
+          </div>
         )}
         <h3>{t('players')}</h3>
         <ul className="players">
