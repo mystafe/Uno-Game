@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 import pkg from '../package.json';
@@ -129,6 +129,8 @@ function App() {
   const [chatMsg, setChatMsg] = useState('');
   const [admin, setAdmin] = useState(false);
   const [, setTitleClicks] = useState(0);
+  const chatBoxRef = useRef(null);
+  const chatToggleRef = useRef(null);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -165,7 +167,10 @@ function App() {
     });
     socket.on('lobbies', setLobbies);
     socket.on('joinError', joinErrorHandler);
-    socket.on('chat', msg => setMessages(m => [...m, msg]));
+    socket.on('chat', msg => {
+      setMessages(m => [...m, msg]);
+      showToast(`${msg.name}: ${msg.message}`);
+    });
     const actionErrorHandler = msg => {
       if (msg === 'specialFinish') showToast(t('noSpecialFinish'));
       else showToast(t('invalidMove'));
@@ -254,7 +259,24 @@ function App() {
     if (!chatMsg.trim()) return;
     socket.emit('chat', { room, name, message: chatMsg });
     setChatMsg('');
+    setChatOpen(false);
   };
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const handleClickOutside = (e) => {
+      if (
+        chatBoxRef.current &&
+        !chatBoxRef.current.contains(e.target) &&
+        chatToggleRef.current &&
+        !chatToggleRef.current.contains(e.target)
+      ) {
+        setChatOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [chatOpen]);
 
   const handleTitleClick = () => {
     setTitleClicks(c => {
@@ -463,25 +485,29 @@ function App() {
           <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
         )}
         <div className="hand">
-          {displayHand.map((c, idx) => (
-            <button
-              key={idx}
-              className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''}`}
-              onClick={spectator ? undefined : () => play(c, idx)}
-              disabled={spectator || !myTurn || actionPending}
-              draggable={!spectator}
-              onDragStart={spectator ? undefined : () => onDragStart(idx)}
-              onDragOver={spectator ? undefined : e => e.preventDefault()}
-              onDrop={spectator ? undefined : () => onDrop(idx)}
-              aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
-            >
-              {cardIcons[c.value] || c.value}
-              {newCards.includes(JSON.stringify(c)) && myTurn && (
-                <span className="new-badge">{t('new')}</span>
-              )}
-              <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
-            </button>
-          ))}
+          {displayHand.map((c, idx) => {
+            const canPlayCard = c.color === 'wild' || c.color === state.top.color || c.value === state.top.value;
+            const playClass = myTurn ? (canPlayCard ? 'playable' : 'unplayable') : '';
+            return (
+              <button
+                key={idx}
+                className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass}`}
+                onClick={spectator ? undefined : () => play(c, idx)}
+                disabled={spectator || !myTurn || actionPending}
+                draggable={!spectator}
+                onDragStart={spectator ? undefined : () => onDragStart(idx)}
+                onDragOver={spectator ? undefined : e => e.preventDefault()}
+                onDrop={spectator ? undefined : () => onDrop(idx)}
+                aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
+              >
+                {cardIcons[c.value] || c.value}
+                {newCards.includes(JSON.stringify(c)) && myTurn && (
+                  <span className="new-badge">{t('new')}</span>
+                )}
+                <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
+              </button>
+            );
+          })}
         </div>
         {!spectator && (
           <div className="game-actions">
@@ -565,9 +591,15 @@ function App() {
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
-      <button className="chat-toggle" onClick={() => setChatOpen(o => !o)}>💬</button>
+      <button
+        className="chat-toggle"
+        onClick={() => setChatOpen(o => !o)}
+        ref={chatToggleRef}
+      >
+        💬
+      </button>
       {chatOpen && (
-        <div className="chat-box">
+        <div className="chat-box" ref={chatBoxRef}>
           <div className="chat-messages">
             {messages.map((m, i) => (
               <div key={i}><strong>{m.name}:</strong> {m.message}</div>
