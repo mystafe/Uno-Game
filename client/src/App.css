@@ -121,6 +121,15 @@
   animation: playCard 0.8s ease forwards;
 }
 
+@keyframes aiPlay {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.card.ai-play {
+  animation: aiPlay 0.5s ease;
+}
+
 @keyframes drawCard {
   from { transform: translateY(-20px) scale(0.8); opacity: 0; }
   to { transform: translateY(0) scale(1); opacity: 1; }

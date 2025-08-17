@@ -141,6 +141,8 @@ function App() {
   const [stacking, setStacking] = useState(true);
   const [multi, setMulti] = useState(true);
   const [topChanging, setTopChanging] = useState(false);
+  const [aiPlaying, setAiPlaying] = useState(false);
+  const prevStateRef = useRef(null);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -250,6 +252,21 @@ function App() {
     const timeout = setTimeout(() => setTopChanging(false), 500);
     return () => clearTimeout(timeout);
   }, [topCard]);
+
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    if (prev && state) {
+      const prevPlayer = prev.players.find(p => p.id === prev.current);
+      const topChanged =
+        prev.top && state.top && (prev.top.color !== state.top.color || prev.top.value !== state.top.value);
+      if (prevPlayer && prevPlayer.id.startsWith('AI-') && topChanged) {
+        setAiPlaying(true);
+        const t = setTimeout(() => setAiPlaying(false), 500);
+        return () => clearTimeout(t);
+      }
+    }
+    prevStateRef.current = state;
+  }, [state]);
 
   const joinLobby = (r) => {
     if (!name) return;
@@ -557,7 +574,7 @@ function App() {
         <div className="top-area">
           <h2>{t('topCard')}</h2>
           <div
-            className={`card ${state.top.color} top ${topChanging ? 'flipping' : ''}`}
+            className={`card ${state.top.color} top ${topChanging ? 'flipping' : ''} ${aiPlaying ? 'ai-play' : ''}`}
             aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
           >
             {cardIcons[state.top.value] || state.top.value}
