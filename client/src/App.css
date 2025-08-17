@@ -56,10 +56,6 @@
   margin-bottom: 1rem;
 }
 
-.top-label {
-  font-size: 0.9rem;
-}
-
 .card:hover:not(:disabled) {
   transform: translateY(-10px) scale(1.05) rotate(-3deg);
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);

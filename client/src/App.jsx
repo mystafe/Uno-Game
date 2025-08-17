@@ -539,18 +539,9 @@ function App() {
           >
             {cardIcons[state.top.value] || state.top.value}
           </div>
-          <span className="top-label">{colorText(state.top.color)} {displayValue(state.top.value)}</span>
         </div>
         <h3>
-          {t('turn')}: {state.players.find(p => p.id === state.current)?.name}{' '}
-          <button
-            className="share-btn"
-            onClick={() => shareRoom(room)}
-            title={t('shareGame')}
-            aria-label={t('shareGame')}
-          >
-            📤
-          </button>
+          {t('turn')}: {state.players.find(p => p.id === state.current)?.name}
         </h3>
         {spectator ? (
           <>
