@@ -39,6 +39,7 @@ const translations = {
     viewing: 'Viewing',
     follow: 'Follow turn',
     leave: 'Leave Game',
+    leaveConfirm: 'Leave the game?',
     shareGame: 'Share Game',
     started: 'started',
     watch: 'Watch',
@@ -83,6 +84,7 @@ const translations = {
     viewing: 'İzlenen',
     follow: 'Sıradakini izle',
     leave: 'Oyundan Ayrıl',
+    leaveConfirm: 'Oyundan ayrılmak istediğinize emin misiniz?',
     shareGame: 'Oyunu Paylaş',
     started: 'başladı',
     watch: 'İzle',
@@ -249,7 +251,7 @@ function App() {
 
   const sendChat = (e) => {
     e.preventDefault();
-    if (!chatMsg) return;
+    if (!chatMsg.trim()) return;
     socket.emit('chat', { room, name, message: chatMsg });
     setChatMsg('');
   };
@@ -272,12 +274,12 @@ function App() {
   const performPlay = (card, idx, target) => {
     setActionPending(true);
     setPlayingIndex(idx);
-    setHand(h => {
-      const newHand = [...h];
-      newHand.splice(idx, 1);
-      return newHand;
-    });
     setTimeout(() => {
+      setHand(h => {
+        const newHand = [...h];
+        newHand.splice(idx, 1);
+        return newHand;
+      });
       socket.emit('play', { room, card, target });
       setPlayingIndex(null);
     }, 400);
@@ -299,6 +301,7 @@ function App() {
       showToast(t('noSpecialFinish'));
       return;
     }
+    setNewCards(cards => cards.filter(c => c !== JSON.stringify(card)));
     if (card.color === 'wild') {
       setColorPicker({ card, idx });
       return;
@@ -345,6 +348,7 @@ function App() {
   };
 
   const leaveGame = () => {
+    if (!window.confirm(t('leaveConfirm'))) return;
     socket.emit('leave', { room });
     localStorage.removeItem('unoGame');
     setJoined(false);
@@ -488,7 +492,7 @@ function App() {
               title={t('shareGame')}
               aria-label={t('shareGame')}
             >
-              📤
+              🔗
             </button>
             <button
               className="leave-btn"
@@ -571,6 +575,7 @@ function App() {
           </div>
           <form onSubmit={sendChat} className="chat-input">
             <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} />
+            <button type="submit" aria-label="Send">📨</button>
           </form>
         </div>
       )}
