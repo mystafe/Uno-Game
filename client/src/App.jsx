@@ -20,7 +20,7 @@ const translations = {
     roomHeading: 'Room',
     start: 'Start',
     topCard: 'Top Card',
-    yourHand: 'Your hand',
+    yourHand: 'Turn:',
     yourTurn: '(Your turn)',
     draw: 'Draw',
     players: 'Players',
@@ -68,7 +68,7 @@ const translations = {
     roomHeading: 'Oda',
     start: 'Başlat',
     topCard: 'Üstteki kart',
-    yourHand: 'Eliniz',
+    yourHand: 'sira:',
     yourTurn: '(Sıra sizde)',
     draw: 'Kart Çek',
     players: 'Oyuncular',
@@ -250,11 +250,11 @@ function App() {
   }, [hand]);
 
   useEffect(() => {
-    if (!topCard) return;
+    if (!topCard || aiPlaying) return;
     setTopChanging(true);
     const timeout = setTimeout(() => setTopChanging(false), 500);
     return () => clearTimeout(timeout);
-  }, [topCard]);
+  }, [topCard, aiPlaying]);
 
   useEffect(() => {
     const prev = prevStateRef.current;
@@ -268,10 +268,19 @@ function App() {
           const cardRect = topCardRef.current.getBoundingClientRect();
           const dx = textRect.left + textRect.width / 2 - (cardRect.left + cardRect.width / 2);
           const dy = textRect.top + textRect.height / 2 - (cardRect.top + cardRect.height / 2);
-          topCardRef.current.style.setProperty('--ai-dx', `${dx}px`);
-          topCardRef.current.style.setProperty('--ai-dy', `${dy}px`);
+          const el = topCardRef.current;
+          el.style.setProperty('--ai-dx', `${dx}px`);
+          el.style.setProperty('--ai-dy', `${dy}px`);
+          el.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`;
+          el.style.opacity = '0';
+          requestAnimationFrame(() => {
+            el.style.removeProperty('transform');
+            el.style.removeProperty('opacity');
+            setAiPlaying(true);
+          });
+        } else {
+          setAiPlaying(true);
         }
-        setAiPlaying(true);
         const t = setTimeout(() => setAiPlaying(false), 1000);
         return () => clearTimeout(t);
       }
