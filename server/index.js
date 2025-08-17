@@ -44,9 +44,9 @@ io.on('connection', socket => {
     io.emit('lobbies', getLobbies());
   });
 
-  socket.on('start', ({ room, ai, options }) => {
+  socket.on('start', ({ room, aiCount, options }) => {
     const game = games[room];
-    if (game && game.start(ai, options)) {
+    if (game && game.start(aiCount, options)) {
       io.to(room).emit('state', game.getState());
       io.emit('lobbies', getLobbies());
       game.checkAI(io, room);
@@ -70,6 +70,27 @@ io.on('connection', socket => {
     if (game && game.draw(socket.id)) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);
+      if (!game.started) io.emit('lobbies', getLobbies());
+    }
+  });
+
+  socket.on('makeAI', ({ room, target }) => {
+    const game = games[room];
+    if (game && game.replaceWithAI(target)) {
+      const targetSocket = io.sockets.sockets.get(target);
+      if (targetSocket) targetSocket.leave(room);
+      io.to(room).emit('state', game.getState());
+      game.checkAI(io, room);
+    }
+  });
+
+  socket.on('kick', ({ room, target }) => {
+    const game = games[room];
+    if (game) {
+      game.removePlayer(target);
+      const targetSocket = io.sockets.sockets.get(target);
+      if (targetSocket) targetSocket.leave(room);
+      io.to(room).emit('state', game.getState());
       if (!game.started) io.emit('lobbies', getLobbies());
     }
   });

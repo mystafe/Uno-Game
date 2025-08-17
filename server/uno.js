@@ -84,16 +84,21 @@ class Game {
     return this.players.every(p => !p.id) && this.spectators.length === 0;
   }
 
-  start(ai = false, options = {}) {
-    if (this.players.length < 2 && !ai) return false;
+  start(aiCount = 0, options = {}) {
+    if (this.players.length < 2 && aiCount === 0) return false;
     this.options = { stacking: true, multi: true, ...options };
     this.pendingDraw = 0;
     this.deck = createDeck();
     this.players.forEach(p => {
       p.hand = this.deck.splice(0, 7);
     });
-    if (ai) {
-      const aiPlayer = { id: `AI-${Date.now()}`, name: this.nextAIName(), hand: this.deck.splice(0, 7), ai: true };
+    for (let i = 0; i < aiCount; i++) {
+      const aiPlayer = {
+        id: `AI-${Date.now()}-${i}`,
+        name: this.nextAIName(),
+        hand: this.deck.splice(0, 7),
+        ai: true,
+      };
       this.players.push(aiPlayer);
     }
     let first = this.drawCard();
