@@ -21,6 +21,7 @@ const translations = {
     yourTurn: '(Your turn)',
     draw: 'Draw',
     players: 'Players',
+    spectators: 'Spectators',
     turn: 'Turn',
     cards: 'cards',
     roomExists: 'Room already exists',
@@ -47,6 +48,8 @@ const translations = {
     wins: 'wins!',
     choosePlayer: 'Choose a player',
     activeLobbies: 'Active Lobbies',
+    chat: 'Chat',
+    emptyRooms: 'Empty All Rooms',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -61,6 +64,7 @@ const translations = {
     yourTurn: '(Sıra sizde)',
     draw: 'Kart Çek',
     players: 'Oyuncular',
+    spectators: 'İzleyiciler',
     turn: 'Sıra',
     cards: 'kart',
     roomExists: 'Oda zaten mevcut',
@@ -87,13 +91,17 @@ const translations = {
     wins: 'kazandı!',
     choosePlayer: 'Bir oyuncu seçin',
     activeLobbies: 'Aktif Lobbiler',
+    chat: 'Sohbet',
+    emptyRooms: 'Tüm Odaları Boşalt',
   },
 };
 
 function App() {
   const [id, setId] = useState('');
   const [name, setName] = useState('');
-  const [room, setRoom] = useState('lobby');
+  const params = new URLSearchParams(window.location.search);
+  const initialRoom = params.get('room') || 'lobby';
+  const [room, setRoom] = useState(initialRoom);
   const [joined, setJoined] = useState(false);
   const [state, setState] = useState(null);
   const [ai, setAi] = useState(false);
@@ -111,6 +119,11 @@ function App() {
   const [watching, setWatching] = useState(null);
   const [follow, setFollow] = useState(true);
   const [sorted, setSorted] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [chatMsg, setChatMsg] = useState('');
+  const [admin, setAdmin] = useState(false);
+  const [titleClicks, setTitleClicks] = useState(0);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -147,6 +160,7 @@ function App() {
     });
     socket.on('lobbies', setLobbies);
     socket.on('joinError', joinErrorHandler);
+    socket.on('chat', msg => setMessages(m => [...m, msg]));
     const actionErrorHandler = msg => {
       if (msg === 'specialFinish') showToast(t('noSpecialFinish'));
       else showToast(t('invalidMove'));
@@ -159,6 +173,7 @@ function App() {
       socket.off('lobbies');
       socket.off('joinError', joinErrorHandler);
       socket.off('actionError', actionErrorHandler);
+      socket.off('chat');
     };
   }, [lang, t]);
 
@@ -213,6 +228,38 @@ function App() {
 
   const start = () => {
     socket.emit('start', { room, ai });
+  };
+
+  const shareRoom = (r) => {
+    const link = `${window.location.origin}?room=${r}`;
+    if (navigator.share) {
+      navigator.share({ url: link });
+    } else {
+      navigator.clipboard.writeText(link);
+      showToast(link);
+    }
+  };
+
+  const sendChat = (e) => {
+    e.preventDefault();
+    if (!chatMsg) return;
+    socket.emit('chat', { room, name, message: chatMsg });
+    setChatMsg('');
+  };
+
+  const handleTitleClick = () => {
+    setTitleClicks(c => {
+      const nc = c + 1;
+      if (nc >= 5) {
+        setAdmin(a => !a);
+        return 0;
+      }
+      return nc;
+    });
+  };
+
+  const emptyRooms = () => {
+    socket.emit('emptyRooms');
   };
 
   const performPlay = (card, idx, target) => {
@@ -305,16 +352,22 @@ function App() {
 
   useEffect(() => {
     const saved = localStorage.getItem('unoGame');
+    const urlRoom = params.get('room');
     if (saved) {
       try {
         const { room: savedRoom, name: savedName } = JSON.parse(saved);
         setName(savedName);
-        setRoom(savedRoom);
-        socket.emit('join', { room: savedRoom, name: savedName });
-        setJoined(true);
+        const joinRoom = urlRoom || savedRoom;
+        if (joinRoom && savedName) {
+          setRoom(joinRoom);
+          socket.emit('join', { room: joinRoom, name: savedName });
+          setJoined(true);
+        }
       } catch {
         // ignore parsing errors
       }
+    } else if (urlRoom) {
+      setRoom(urlRoom);
     }
   }, []);
 
@@ -350,7 +403,7 @@ function App() {
   } else if (!state || !state.started) {
     content = (
       <div className="lobby">
-        <h2>{t('roomHeading')}: {room}</h2>
+        <h2>{t('roomHeading')}: {room} <button className="share-btn" onClick={() => shareRoom(room)}>🔗</button></h2>
         {state?.winner && <h3>{t('winner')}: {state.players.find(p => p.id === state.winner)?.name}</h3>}
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
@@ -375,7 +428,7 @@ function App() {
           </div>
           <span className="top-label">{colorText(state.top.color)} {displayValue(state.top.value)}</span>
         </div>
-        <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name}</h3>
+        <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name} <button className="share-btn" onClick={() => shareRoom(room)}>🔗</button></h3>
         {spectator ? (
           <>
             <h3>{t('viewing')}: {viewingPlayer?.name}</h3>
@@ -421,13 +474,25 @@ function App() {
             </li>
           ))}
         </ul>
+        {state.spectators?.length > 0 && (
+          <>
+            <h3>{t('spectators')}</h3>
+            <ul className="players spectators">
+              {state.spectators.map(s => (
+                <li key={s.id}>{s.name}</li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     );
   }
   return (
     <>
       <header className="app-header">
-        <h1 className="app-title" data-version={pkg.version} title={pkg.version}>{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
+        <h1 className="app-title" data-version={pkg.version} title={pkg.version} onClick={handleTitleClick}>{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
+        {admin && <span className="admin-badge">ADMIN</span>}
+        {admin && <button className="empty-btn" onClick={emptyRooms}>{t('emptyRooms')}</button>}
       </header>
       {content}
       {colorPicker && (
@@ -458,6 +523,19 @@ function App() {
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
+      <button className="chat-toggle" onClick={() => setChatOpen(o => !o)}>💬</button>
+      {chatOpen && (
+        <div className="chat-box">
+          <div className="chat-messages">
+            {messages.map((m, i) => (
+              <div key={i}><strong>{m.name}:</strong> {m.message}</div>
+            ))}
+          </div>
+          <form onSubmit={sendChat} className="chat-input">
+            <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} />
+          </form>
+        </div>
+      )}
       <footer className="app-footer">{t('developedBy')}</footer>
     </>
   );

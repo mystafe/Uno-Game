@@ -27,6 +27,7 @@ class Game {
   constructor(room) {
     this.room = room;
     this.players = [];
+    this.spectators = [];
     this.turn = 0;
     this.direction = 1;
     this.started = false;
@@ -59,8 +60,17 @@ class Game {
     this.players = this.players.filter(p => p.id !== id);
   }
 
+  addSpectator(id, name) {
+    if (this.spectators.find(s => s.id === id)) return;
+    this.spectators.push({ id, name });
+  }
+
+  removeSpectator(id) {
+    this.spectators = this.spectators.filter(s => s.id !== id);
+  }
+
   isEmpty() {
-    return this.players.every(p => !p.id);
+    return this.players.every(p => !p.id) && this.spectators.length === 0;
   }
 
   start(ai = false) {
@@ -260,6 +270,7 @@ class Game {
     return {
       started: this.started,
       players: this.players.map(p => ({ id: p.id, name: p.name, hand: p.hand })),
+      spectators: this.spectators.map(s => ({ id: s.id, name: s.name })),
       current: this.currentPlayer() ? this.currentPlayer().id : null,
       top: this.discard[this.discard.length - 1],
       winner: this.winner
