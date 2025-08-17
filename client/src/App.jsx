@@ -289,6 +289,16 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [chatOpen]);
 
+  useEffect(() => {
+    const handleClearSelection = (e) => {
+      if (!e.target.closest('.card')) {
+        setSelected([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClearSelection);
+    return () => document.removeEventListener('mousedown', handleClearSelection);
+  }, []);
+
   const handleTitleClick = () => {
     setTitleClicks(c => {
       const nc = c + 1;
@@ -307,6 +317,7 @@ function App() {
   const performPlay = (cards, indices, target) => {
     setActionPending(true);
     setPlayingIndex(indices[0]);
+    setSelected([]);
     setTimeout(() => {
       setHand(h => {
         const newHand = [...h];
@@ -324,7 +335,6 @@ function App() {
       });
       socket.emit('play', { room, cards, target });
       setPlayingIndex(null);
-      setSelected([]);
     }, 400);
   };
 
@@ -499,14 +509,18 @@ function App() {
           <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
           {t('addComputer')}
         </label>
-        <label>
-          <input type="checkbox" checked={stacking} onChange={e => setStacking(e.target.checked)} />
-          {t('stacking')}
-        </label>
-        <label>
-          <input type="checkbox" checked={multi} onChange={e => setMulti(e.target.checked)} />
-          {t('multiPlay')}
-        </label>
+        {admin && (
+          <>
+            <label>
+              <input type="checkbox" checked={stacking} onChange={e => setStacking(e.target.checked)} />
+              {t('stacking')}
+            </label>
+            <label>
+              <input type="checkbox" checked={multi} onChange={e => setMulti(e.target.checked)} />
+              {t('multiPlay')}
+            </label>
+          </>
+        )}
         <button onClick={start}>{t('start')}</button>
       </div>
     );
@@ -554,6 +568,12 @@ function App() {
               if (state.pendingDraw > 0) {
                 if (top.value === 'draw2') return c.value === 'draw2';
                 if (top.value === 'wild4') return c.value === 'wild4';
+              }
+              if (selected.length) {
+                const first = hand[selected[0]];
+                if (selected.includes(idx)) return true;
+                if (!state?.options?.multi) return false;
+                return c.value === first.value;
               }
               return c.color === 'wild' || c.color === state.top.color || c.value === state.top.value;
             })();
