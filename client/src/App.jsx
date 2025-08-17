@@ -140,8 +140,8 @@ function App() {
   const [selected, setSelected] = useState([]);
   const [stacking, setStacking] = useState(true);
   const [multi, setMulti] = useState(true);
-  const [topChanging, setTopChanging] = useState(false);
   const [aiPlaying, setAiPlaying] = useState(false);
+  const [displayTop, setDisplayTop] = useState(null);
   const prevStateRef = useRef(null);
   const topCardRef = useRef(null);
   const topTextRef = useRef(null);
@@ -149,7 +149,6 @@ function App() {
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
-  const topCard = state?.top;
 
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
   const colorText = (color) => translations[lang].colors[color] || color;
@@ -162,7 +161,6 @@ function App() {
     wild4: '🌈+4',
     swap: '🔄',
   };
-  const displayValue = (val) => cardIcons[val] ? `${cardIcons[val]} ${valueText(val)}` : valueText(val);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -250,42 +248,51 @@ function App() {
   }, [hand]);
 
   useEffect(() => {
-    if (!topCard || aiPlaying) return;
-    setTopChanging(true);
-    const timeout = setTimeout(() => setTopChanging(false), 500);
-    return () => clearTimeout(timeout);
-  }, [topCard, aiPlaying]);
-
-  useEffect(() => {
     const prev = prevStateRef.current;
-    if (prev && state) {
-      const prevPlayer = prev.players.find(p => p.id === prev.current);
-      const topChanged =
-        prev.top && state.top && (prev.top.color !== state.top.color || prev.top.value !== state.top.value);
-      if (prevPlayer && prevPlayer.id.startsWith('AI-') && topChanged) {
-        if (topCardRef.current && topTextRef.current) {
-          const textRect = topTextRef.current.getBoundingClientRect();
-          const cardRect = topCardRef.current.getBoundingClientRect();
-          const dx = textRect.left + textRect.width / 2 - (cardRect.left + cardRect.width / 2);
-          const dy = textRect.top + textRect.height / 2 - (cardRect.top + cardRect.height / 2);
-          const el = topCardRef.current;
-          el.style.setProperty('--ai-dx', `${dx}px`);
-          el.style.setProperty('--ai-dy', `${dy}px`);
-          el.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`;
-          el.style.opacity = '0';
-          requestAnimationFrame(() => {
-            el.style.removeProperty('transform');
-            el.style.removeProperty('opacity');
-            setAiPlaying(true);
-          });
+    let timeout;
+    let endTimeout;
+    if (state) {
+      if (!prev) {
+        setDisplayTop(state.top);
+      } else {
+        const prevPlayer = prev.players.find(p => p.id === prev.current);
+        const topChanged =
+          prev.top && state.top && (prev.top.color !== state.top.color || prev.top.value !== state.top.value);
+        if (prevPlayer && prevPlayer.id.startsWith('AI-') && topChanged) {
+          setDisplayTop(prev.top);
+          timeout = setTimeout(() => {
+            if (topCardRef.current && topTextRef.current) {
+              const textRect = topTextRef.current.getBoundingClientRect();
+              const cardRect = topCardRef.current.getBoundingClientRect();
+              const dx = textRect.left + textRect.width / 2 - (cardRect.left + cardRect.width / 2);
+              const dy = textRect.top + textRect.height / 2 - (cardRect.top + cardRect.height / 2);
+              const el = topCardRef.current;
+              el.style.setProperty('--ai-dx', `${dx}px`);
+              el.style.setProperty('--ai-dy', `${dy}px`);
+              el.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`;
+              el.style.opacity = '0';
+              requestAnimationFrame(() => {
+                setDisplayTop(state.top);
+                el.style.removeProperty('transform');
+                el.style.removeProperty('opacity');
+                setAiPlaying(true);
+              });
+            } else {
+              setDisplayTop(state.top);
+              setAiPlaying(true);
+            }
+            endTimeout = setTimeout(() => setAiPlaying(false), 1000);
+          }, 1500);
         } else {
-          setAiPlaying(true);
+          setDisplayTop(state.top);
         }
-        const t = setTimeout(() => setAiPlaying(false), 1000);
-        return () => clearTimeout(t);
       }
     }
     prevStateRef.current = state;
+    return () => {
+      if (timeout) clearTimeout(timeout);
+      if (endTimeout) clearTimeout(endTimeout);
+    };
   }, [state]);
 
   const joinLobby = (r) => {
@@ -604,14 +611,14 @@ function App() {
           <h2 ref={topTextRef}>{t('topCard')}</h2>
           <div
             ref={topCardRef}
-            className={`card ${state.top.color} top ${topChanging ? 'flipping' : ''} ${aiPlaying ? 'ai-play' : ''}`}
-            aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
+            className={`card ${displayTop?.color} top ${aiPlaying ? 'ai-play' : ''}`}
+            aria-label={displayTop ? `${colorText(displayTop.color)} ${valueText(displayTop.value)}` : ''}
           >
-            {cardIcons[state.top.value] || state.top.value}
+            {displayTop ? (cardIcons[displayTop.value] || displayTop.value) : ''}
           </div>
-          {state.pendingDraw > 0 && (
+          {state.pendingDraw > 0 && displayTop && (
             <p className="penalty-info">
-              {`${colorText(state.top.color)} ${valueText(state.top.value)} (${state.pendingDraw} ${lang === 'tr' ? 'kart ceza' : 'card penalty'})`}
+              {`${colorText(displayTop.color)} ${valueText(displayTop.value)} (${state.pendingDraw} ${lang === 'tr' ? 'kart ceza' : 'card penalty'})`}
             </p>
           )}
         </div>
@@ -661,7 +668,6 @@ function App() {
               >
                 {isNew && <span className="new-banner">{t('new')}</span>}
                 {cardIcons[c.value] || c.value}
-                <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
               </button>
             );
           })}
