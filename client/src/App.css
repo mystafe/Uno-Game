@@ -33,6 +33,8 @@
   font-weight: bold;
   color: #fff;
   position: relative;
+  --dx: -40px;
+  --dy: -80px;
 }
 
 .card.red { background: #e74c3c; }
@@ -53,6 +55,8 @@
   height: 90px;
   font-size: 1.5rem;
   cursor: default;
+  --ai-dx: 0;
+  --ai-dy: -40px;
 }
 
 .top-area {
@@ -113,8 +117,8 @@
 }
 
 @keyframes playCard {
-  from { transform: translate(0,0) scale(1); opacity: 1; }
-  to { transform: translate(-40px,-80px) scale(0.8); opacity: 0.5; }
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to { transform: translate(var(--dx), var(--dy)) scale(0.8); opacity: 0.5; }
 }
 
 .card.playing {
@@ -122,12 +126,12 @@
 }
 
 @keyframes aiPlay {
-  from { transform: scale(0.5); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: translate(var(--ai-dx), var(--ai-dy)) scale(0.5); opacity: 0; }
+  to { transform: translate(0, 0) scale(1); opacity: 1; }
 }
 
 .card.ai-play {
-  animation: aiPlay 0.5s ease;
+  animation: aiPlay 1s ease forwards;
 }
 
 @keyframes drawCard {

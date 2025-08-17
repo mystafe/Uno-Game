@@ -143,6 +143,9 @@ function App() {
   const [topChanging, setTopChanging] = useState(false);
   const [aiPlaying, setAiPlaying] = useState(false);
   const prevStateRef = useRef(null);
+  const topCardRef = useRef(null);
+  const topTextRef = useRef(null);
+  const cardRefs = useRef([]);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -260,8 +263,16 @@ function App() {
       const topChanged =
         prev.top && state.top && (prev.top.color !== state.top.color || prev.top.value !== state.top.value);
       if (prevPlayer && prevPlayer.id.startsWith('AI-') && topChanged) {
+        if (topCardRef.current && topTextRef.current) {
+          const textRect = topTextRef.current.getBoundingClientRect();
+          const cardRect = topCardRef.current.getBoundingClientRect();
+          const dx = textRect.left + textRect.width / 2 - (cardRect.left + cardRect.width / 2);
+          const dy = textRect.top + textRect.height / 2 - (cardRect.top + cardRect.height / 2);
+          topCardRef.current.style.setProperty('--ai-dx', `${dx}px`);
+          topCardRef.current.style.setProperty('--ai-dy', `${dy}px`);
+        }
         setAiPlaying(true);
-        const t = setTimeout(() => setAiPlaying(false), 500);
+        const t = setTimeout(() => setAiPlaying(false), 1000);
         return () => clearTimeout(t);
       }
     }
@@ -347,6 +358,15 @@ function App() {
   };
 
   const performPlay = (cards, indices, target) => {
+    const cardEl = cardRefs.current[indices[0]];
+    if (cardEl && topCardRef.current) {
+      const cardRect = cardEl.getBoundingClientRect();
+      const topRect = topCardRef.current.getBoundingClientRect();
+      const dx = topRect.left + topRect.width / 2 - (cardRect.left + cardRect.width / 2);
+      const dy = topRect.top + topRect.height / 2 - (cardRect.top + cardRect.height / 2);
+      cardEl.style.setProperty('--dx', `${dx}px`);
+      cardEl.style.setProperty('--dy', `${dy}px`);
+    }
     setActionPending(true);
     setPlayingIndex(indices[0]);
     setSelected([]);
@@ -570,10 +590,11 @@ function App() {
       newCounts[k] = (newCounts[k] || 0) + 1;
     });
     content = (
-      <div className="game">
+        <div className="game">
         <div className="top-area">
-          <h2>{t('topCard')}</h2>
+          <h2 ref={topTextRef}>{t('topCard')}</h2>
           <div
+            ref={topCardRef}
             className={`card ${state.top.color} top ${topChanging ? 'flipping' : ''} ${aiPlaying ? 'ai-play' : ''}`}
             aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
           >
@@ -619,6 +640,7 @@ function App() {
             return (
               <button
                 key={idx}
+                ref={el => (cardRefs.current[idx] = el)}
                 className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass} ${isNew ? 'drawn' : ''} ${selected.includes(idx) ? 'selected' : ''}`}
                 onClick={spectator ? undefined : () => handleCardClick(c, idx)}
                 disabled={spectator || !myTurn || actionPending}
