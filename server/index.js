@@ -44,18 +44,18 @@ io.on('connection', socket => {
     io.emit('lobbies', getLobbies());
   });
 
-  socket.on('start', ({ room, ai }) => {
+  socket.on('start', ({ room, ai, options }) => {
     const game = games[room];
-    if (game && game.start(ai)) {
+    if (game && game.start(ai, options)) {
       io.to(room).emit('state', game.getState());
       io.emit('lobbies', getLobbies());
       game.checkAI(io, room);
     }
   });
 
-  socket.on('play', ({ room, card, target }) => {
+  socket.on('play', ({ room, cards, card, target }) => {
     const game = games[room];
-    const result = game && game.play(socket.id, card, target);
+    const result = game && game.play(socket.id, cards || card, target);
     if (result === true) {
       io.to(room).emit('state', game.getState());
       game.checkAI(io, room);

@@ -55,6 +55,8 @@ const translations = {
     chat: 'Chat',
     emptyRooms: 'Empty All Rooms',
     new: 'New',
+    stacking: 'Stacking',
+    multiPlay: 'Multi Play',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -100,6 +102,8 @@ const translations = {
     chat: 'Sohbet',
     emptyRooms: 'Tüm Odaları Boşalt',
     new: 'Yeni',
+    stacking: 'Katlama',
+    multiPlay: 'Çoklu Oynama',
   },
 };
 
@@ -131,6 +135,9 @@ function App() {
   const [, setTitleClicks] = useState(0);
   const chatBoxRef = useRef(null);
   const chatToggleRef = useRef(null);
+  const [selected, setSelected] = useState([]);
+  const [stacking, setStacking] = useState(true);
+  const [multi, setMulti] = useState(true);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -163,6 +170,10 @@ function App() {
     socket.on('connect', () => setId(socket.id));
     socket.on('state', st => {
       setState(st);
+      if (!st.started && st.options) {
+        setStacking(st.options.stacking);
+        setMulti(st.options.multi);
+      }
       setActionPending(false);
     });
     socket.on('lobbies', setLobbies);
@@ -241,7 +252,7 @@ function App() {
   };
 
   const start = () => {
-    socket.emit('start', { room, ai });
+    socket.emit('start', { room, ai, options: { stacking, multi } });
   };
 
   const shareRoom = (r) => {
@@ -293,67 +304,98 @@ function App() {
     socket.emit('emptyRooms');
   };
 
-  const performPlay = (card, idx, target) => {
+  const performPlay = (cards, indices, target) => {
     setActionPending(true);
-    setPlayingIndex(idx);
+    setPlayingIndex(indices[0]);
     setTimeout(() => {
       setHand(h => {
         const newHand = [...h];
-        newHand.splice(idx, 1);
+        indices.sort((a, b) => b - a).forEach(i => newHand.splice(i, 1));
         return newHand;
       });
-      socket.emit('play', { room, card, target });
+      setNewCards(cn => {
+        const updated = [...cn];
+        cards.forEach(card => {
+          const key = JSON.stringify(card);
+          const idx = updated.indexOf(key);
+          if (idx !== -1) updated.splice(idx, 1);
+        });
+        return updated;
+      });
+      socket.emit('play', { room, cards, target });
       setPlayingIndex(null);
+      setSelected([]);
     }, 400);
   };
 
-  const play = (card, idx) => {
+  const attemptPlay = () => {
     if (!myTurn) {
       showToast(t('notYourTurn'));
       return;
     }
     if (actionPending) return;
+    if (!selected.length) return;
+    const cardsToPlay = selected.map(i => hand[i]);
+    const first = cardsToPlay[0];
     const top = state.top;
-    const canPlay = card.color === 'wild' || card.color === top.color || card.value === top.value;
+    const canPlay = first.color === 'wild' || first.color === top.color || first.value === top.value;
     if (!canPlay) {
       showToast(t('invalidMove'));
+      setSelected([]);
       return;
     }
-    if (hand.length === 1 && typeof card.value !== 'number') {
+    if (!cardsToPlay.every(c => c.value === first.value)) {
+      showToast(t('invalidMove'));
+      setSelected([]);
+      return;
+    }
+    if (!state?.options?.multi && cardsToPlay.length > 1) {
+      showToast(t('invalidMove'));
+      setSelected([]);
+      return;
+    }
+    if (hand.length === cardsToPlay.length && cardsToPlay.some(c => typeof c.value !== 'number')) {
       showToast(t('noSpecialFinish'));
+      setSelected([]);
       return;
     }
-    setNewCards(cards => {
-      const key = JSON.stringify(card);
-      const idx = cards.indexOf(key);
-      if (idx === -1) return cards;
-      const updated = [...cards];
-      updated.splice(idx, 1);
-      return updated;
-    });
-    if (card.color === 'wild') {
-      setColorPicker({ card, idx });
+    if (first.color === 'wild') {
+      setColorPicker({ cards: cardsToPlay, indices: selected });
       return;
     }
-    performPlay(card, idx);
+    performPlay(cardsToPlay, selected);
+  };
+
+  const handleCardClick = (card, idx) => {
+    if (selected.includes(idx)) {
+      attemptPlay();
+    } else {
+      setSelected(prev => {
+        if (prev.length && (!state?.options?.multi || hand[prev[0]].value !== card.value)) {
+          return [idx];
+        }
+        return [...prev, idx];
+      });
+    }
   };
 
   const chooseColor = (color) => {
     if (!colorPicker) return;
-    const { card, idx } = colorPicker;
+    const { cards, indices } = colorPicker;
     setColorPicker(null);
-    if (card.value === 'swap') {
-      setSwapPicker({ card: { ...card, chosenColor: color }, idx });
+    const updated = cards.map((c, i) => i === 0 ? { ...c, chosenColor: color } : c);
+    if (cards[0].value === 'swap') {
+      setSwapPicker({ cards: updated, indices });
     } else {
-      performPlay({ ...card, chosenColor: color }, idx);
+      performPlay(updated, indices);
     }
   };
 
   const chooseSwapTarget = (targetId) => {
     if (!swapPicker) return;
-    const { card, idx } = swapPicker;
+    const { cards, indices } = swapPicker;
     setSwapPicker(null);
-    performPlay(card, idx, targetId);
+    performPlay(cards, indices, targetId);
   };
 
   const draw = () => {
@@ -363,6 +405,7 @@ function App() {
     }
     if (actionPending) return;
     setActionPending(true);
+    setSelected([]);
     socket.emit('draw', { room });
   };
 
@@ -456,6 +499,14 @@ function App() {
           <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
           {t('addComputer')}
         </label>
+        <label>
+          <input type="checkbox" checked={stacking} onChange={e => setStacking(e.target.checked)} />
+          {t('stacking')}
+        </label>
+        <label>
+          <input type="checkbox" checked={multi} onChange={e => setMulti(e.target.checked)} />
+          {t('multiPlay')}
+        </label>
         <button onClick={start}>{t('start')}</button>
       </div>
     );
@@ -498,15 +549,22 @@ function App() {
         <div className="hand">
           {displayHand.map((c, idx) => {
             const key = JSON.stringify(c);
-            const canPlayCard = c.color === 'wild' || c.color === state.top.color || c.value === state.top.value;
+            const canPlayCard = (() => {
+              const top = state.top;
+              if (state.pendingDraw > 0) {
+                if (top.value === 'draw2') return c.value === 'draw2';
+                if (top.value === 'wild4') return c.value === 'wild4';
+              }
+              return c.color === 'wild' || c.color === state.top.color || c.value === state.top.value;
+            })();
             const playClass = myTurn ? (canPlayCard ? 'playable' : 'unplayable') : '';
             const isNew = myTurn && newCounts[key] > 0;
             if (isNew) newCounts[key]--;
             return (
               <button
                 key={idx}
-                className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass}`}
-                onClick={spectator ? undefined : () => play(c, idx)}
+                className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass} ${selected.includes(idx) ? 'selected' : ''}`}
+                onClick={spectator ? undefined : () => handleCardClick(c, idx)}
                 disabled={spectator || !myTurn || actionPending}
                 draggable={!spectator}
                 onDragStart={spectator ? undefined : () => onDragStart(idx)}

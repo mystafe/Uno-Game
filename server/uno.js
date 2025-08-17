@@ -35,6 +35,8 @@ class Game {
     this.deck = [];
     this.ai = null;
     this.winner = null;
+    this.pendingDraw = 0;
+    this.options = { stacking: true, multi: true };
   }
 
   addPlayer(id, name) {
@@ -73,8 +75,10 @@ class Game {
     return this.players.every(p => !p.id) && this.spectators.length === 0;
   }
 
-  start(ai = false) {
+  start(ai = false, options = {}) {
     if (this.players.length < 2 && !ai) return false;
+    this.options = { stacking: true, multi: true, ...options };
+    this.pendingDraw = 0;
     this.deck = createDeck();
     this.players.forEach(p => {
       p.hand = this.deck.splice(0, 7);
@@ -105,6 +109,10 @@ class Game {
   canPlay(card) {
     if (!card) return false;
     const top = this.discard[this.discard.length - 1];
+    if (this.pendingDraw > 0) {
+      if (top.value === 'draw2') return card.value === 'draw2';
+      if (top.value === 'wild4') return card.value === 'wild4';
+    }
     return (
       card.color === 'wild' ||
       card.color === top.color ||
@@ -121,22 +129,36 @@ class Game {
     return this.deck.pop();
   }
 
-  play(id, card, target) {
+  play(id, cards, target) {
     if (!this.started) return false;
     const player = this.currentPlayer();
     if (player.id !== id) return false;
-    const idx = player.hand.findIndex(c => c.color === card.color && c.value === card.value);
-    if (idx === -1 || !this.canPlay(card)) return false;
 
-    const isSpecial = card.color === 'wild' || typeof card.value !== 'number';
-    if (player.hand.length === 1 && isSpecial) return 'specialFinish';
+    if (!Array.isArray(cards)) cards = [cards];
+    if (!this.options.multi && cards.length > 1) return false;
 
-    player.hand.splice(idx, 1);
-    if (card.color === 'wild' && card.chosenColor) {
-      this.discard.push({ color: card.chosenColor, value: card.value });
-    } else {
-      this.discard.push(card);
-    }
+    const first = cards[0];
+    if (!this.canPlay(first)) return false;
+    if (!cards.every(c => c.value === first.value)) return false;
+
+    const indices = cards.map(card =>
+      player.hand.findIndex(c => c.color === card.color && c.value === card.value)
+    );
+    if (indices.some(i => i === -1)) return false;
+
+    const isSpecial = first.color === 'wild' || typeof first.value !== 'number';
+    if (player.hand.length === cards.length && isSpecial) return 'specialFinish';
+
+    // remove cards from hand
+    indices.sort((a, b) => b - a).forEach(i => player.hand.splice(i, 1));
+
+    cards.forEach((card, i) => {
+      if (card.color === 'wild' && card.chosenColor && i === 0) {
+        this.discard.push({ color: card.chosenColor, value: card.value });
+      } else {
+        this.discard.push(card);
+      }
+    });
 
     if (player.hand.length === 0) {
       this.started = false;
@@ -144,7 +166,7 @@ class Game {
       return true;
     }
 
-    switch (card.value) {
+    switch (first.value) {
       case 'reverse':
         this.direction *= -1;
         this.nextTurn();
@@ -155,13 +177,25 @@ class Game {
         break;
       case 'draw2':
         this.nextTurn();
-        this.currentPlayer().hand.push(this.drawCard(), this.drawCard());
-        this.nextTurn();
+        if (this.options.stacking) {
+          this.pendingDraw += 2 * cards.length;
+        } else {
+          for (let i = 0; i < 2 * cards.length; i++) {
+            this.currentPlayer().hand.push(this.drawCard());
+          }
+          this.nextTurn();
+        }
         break;
       case 'wild4':
         this.nextTurn();
-        this.currentPlayer().hand.push(this.drawCard(), this.drawCard(), this.drawCard(), this.drawCard());
-        this.nextTurn();
+        if (this.options.stacking) {
+          this.pendingDraw += 4 * cards.length;
+        } else {
+          for (let i = 0; i < 4 * cards.length; i++) {
+            this.currentPlayer().hand.push(this.drawCard());
+          }
+          this.nextTurn();
+        }
         break;
       case 'swap':
         if (target) {
@@ -181,7 +215,11 @@ class Game {
     if (!this.started) return false;
     const player = this.currentPlayer();
     if (player.id !== id) return false;
-    player.hand.push(this.drawCard());
+    const count = this.pendingDraw > 0 ? this.pendingDraw : 1;
+    for (let i = 0; i < count; i++) {
+      player.hand.push(this.drawCard());
+    }
+    this.pendingDraw = 0;
     this.nextTurn();
     return true;
   }
@@ -205,62 +243,24 @@ class Game {
       let card = playable[0];
       if (player.hand.length === 1 && (card.color === 'wild' || typeof card.value !== 'number')) {
         const numeric = playable.find(c => typeof c.value === 'number');
-        if (numeric) {
-          card = numeric;
-        } else {
-          player.hand.push(this.drawCard());
-          this.nextTurn();
+        if (numeric) card = numeric;
+        else {
+          this.draw(player.id);
           io.to(room).emit('state', this.getState());
           if (this.started) this.checkAI(io, room);
           return;
         }
       }
-      const idx = player.hand.findIndex(c => c === card);
-      player.hand.splice(idx, 1);
       if (card.color === 'wild') {
         const colorCounts = COLORS.map(color => ({
           color,
           count: player.hand.filter(c => c.color === color).length,
         })).sort((a, b) => b.count - a.count);
-        this.discard.push({ color: colorCounts[0].color, value: card.value });
-      } else {
-        this.discard.push(card);
+        card = { ...card, chosenColor: colorCounts[0].color };
       }
-      if (player.hand.length === 0) {
-        this.started = false;
-        this.winner = player.id;
-      } else {
-        switch (card.value) {
-          case 'reverse':
-            this.direction *= -1;
-            this.nextTurn();
-            break;
-          case 'skip':
-            this.nextTurn();
-            this.nextTurn();
-            break;
-          case 'draw2':
-            this.nextTurn();
-            this.currentPlayer().hand.push(this.drawCard(), this.drawCard());
-            this.nextTurn();
-            break;
-          case 'wild4':
-            this.nextTurn();
-            this.currentPlayer().hand.push(this.drawCard(), this.drawCard(), this.drawCard(), this.drawCard());
-            this.nextTurn();
-            break;
-          case 'swap':
-            const target = this.players.filter(p => p.id !== player.id).sort((a, b) => b.hand.length - a.hand.length)[0];
-            if (target) [player.hand, target.hand] = [target.hand, player.hand];
-            this.nextTurn();
-            break;
-          default:
-            this.nextTurn();
-        }
-      }
+      this.play(player.id, card);
     } else {
-      player.hand.push(this.drawCard());
-      this.nextTurn();
+      this.draw(player.id);
     }
     io.to(room).emit('state', this.getState());
     if (this.started) this.checkAI(io, room);
@@ -273,7 +273,9 @@ class Game {
       spectators: this.spectators.map(s => ({ id: s.id, name: s.name })),
       current: this.currentPlayer() ? this.currentPlayer().id : null,
       top: this.discard[this.discard.length - 1],
-      winner: this.winner
+      winner: this.winner,
+      pendingDraw: this.pendingDraw,
+      options: this.options
     };
   }
 }
