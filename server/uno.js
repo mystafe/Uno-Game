@@ -118,6 +118,9 @@ class Game {
     const idx = player.hand.findIndex(c => c.color === card.color && c.value === card.value);
     if (idx === -1 || !this.canPlay(card)) return false;
 
+    const isSpecial = card.color === 'wild' || typeof card.value !== 'number';
+    if (player.hand.length === 1 && isSpecial) return 'specialFinish';
+
     player.hand.splice(idx, 1);
     if (card.color === 'wild' && card.chosenColor) {
       this.discard.push({ color: card.chosenColor, value: card.value });
@@ -189,7 +192,19 @@ class Game {
     const playable = player.hand.filter(c => c && this.canPlay(c));
     if (playable.length) {
       playable.sort((a, b) => (priority[b.value] || 0) - (priority[a.value] || 0));
-      const card = playable[0];
+      let card = playable[0];
+      if (player.hand.length === 1 && (card.color === 'wild' || typeof card.value !== 'number')) {
+        const numeric = playable.find(c => typeof c.value === 'number');
+        if (numeric) {
+          card = numeric;
+        } else {
+          player.hand.push(this.drawCard());
+          this.nextTurn();
+          io.to(room).emit('state', this.getState());
+          if (this.started) this.checkAI(io, room);
+          return;
+        }
+      }
       const idx = player.hand.findIndex(c => c === card);
       player.hand.splice(idx, 1);
       if (card.color === 'wild') {

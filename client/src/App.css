@@ -145,18 +145,36 @@
     height: 68px;
     font-size: 1.2rem;
   }
+  .app-header {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+  .app-title {
+    font-size: 2rem;
+  }
 }
 
 .toast {
   position: fixed;
   top: 1rem;
   right: 1rem;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.9);
   color: #fff;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  animation: fadeIn 0.3s ease;
+  padding: 0.75rem 1.25rem;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-left: 4px solid #ffcc00;
+  animation: slideIn 0.3s ease, fadeOut 0.5s ease 2.5s forwards;
   z-index: 1000;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; }
 }
 
 .app-header, .app-footer {
@@ -192,6 +210,49 @@
   margin-top: 4px;
 }
 
+.game-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.game-actions button {
+  border: none;
+  color: #fff;
+}
+
+.game-actions button:hover {
+  opacity: 0.9;
+}
+
+.draw-btn {
+  background: linear-gradient(145deg, #27ae60, #219150);
+}
+
+.sort-btn {
+  background: linear-gradient(145deg, #3498db, #2c7ac7);
+}
+
+.leave-btn {
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+}
+
+.players {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.players li {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+}
+
 .app-title:hover::after {
   opacity: 1;
 }
@@ -206,27 +267,33 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.85);
-  padding: 1rem;
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
   z-index: 1000;
 }
 
 .color-picker .color-btn {
-  width: 50px;
-  height: 50px;
-  border: none;
-  border-radius: 4px;
+  width: 60px;
+  height: 60px;
+  border: 2px solid #fff;
+  border-radius: 50%;
   cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.color-picker .color-btn:hover {
+  transform: scale(1.1);
 }
 
 .color-picker .color-options {
   display: flex;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 .color-picker p {
