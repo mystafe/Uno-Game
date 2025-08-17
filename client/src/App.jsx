@@ -32,7 +32,7 @@ const translations = {
     invalidMove: 'Invalid move',
     notYourTurn: 'Not your turn',
     nameTaken: 'Name already used',
-    chooseColor: 'Choose a color',
+    chooseColor: '',
     noSpecialFinish: 'You cannot finish with a special card',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4', swap: 'Swap Hands' },
@@ -64,7 +64,7 @@ const translations = {
     join: 'Katıl',
     roomHeading: 'Oda',
     start: 'Başlat',
-    topCard: 'Üst Kart',
+    topCard: 'Üstteki kart',
     yourHand: 'Eliniz',
     yourTurn: '(Sıra sizde)',
     draw: 'Kart Çek',
@@ -77,7 +77,7 @@ const translations = {
     invalidMove: 'Geçersiz hamle',
     notYourTurn: 'Sıra sizde değil',
     nameTaken: 'Bu isim zaten kullanılıyor',
-    chooseColor: 'Renk seçin',
+    chooseColor: '',
     noSpecialFinish: 'Özel kart ile oyunu bitiremezsiniz',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker', swap: 'El Değiştir' },
@@ -210,7 +210,7 @@ function App() {
               newOnes.push(key);
             }
           });
-          if (newOnes.length) {
+          if (prev.length !== 0 && newOnes.length) {
             setNewCards(cards => Array.from(new Set([...cards, ...newOnes])));
           }
           return sortedHand;
@@ -565,7 +565,6 @@ function App() {
       {content}
       {colorPicker && (
         <div className="color-picker">
-          <p>{t('chooseColor')}</p>
           <div className="color-options">
             {COLORS.map(c => (
               <button key={c} className={`color-btn ${c}`} onClick={() => chooseColor(c)}>
