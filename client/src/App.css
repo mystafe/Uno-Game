@@ -1,6 +1,6 @@
 .join, .lobby, .game {
   text-align: center;
-  margin: 2rem;
+  margin: 1rem 2rem;
   padding: 2rem;
   border-radius: 1rem;
   background: rgba(0, 0, 0, 0.3);
@@ -68,6 +68,14 @@
 .card:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.card.playable {
+  filter: brightness(1.15);
+}
+
+.card.unplayable {
+  filter: brightness(0.7);
 }
 
 .card .tooltip {
@@ -182,8 +190,8 @@
 }
 
 .app-header {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .app-title {
@@ -424,7 +432,7 @@
 
 @media (max-width: 600px) {
   .join, .lobby, .game {
-    margin: 1rem;
+    margin: 0.5rem;
     padding: 1rem;
   }
   .top-area {
