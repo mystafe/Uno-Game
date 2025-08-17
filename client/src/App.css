@@ -308,8 +308,12 @@
   font-size: 0.75rem;
 }
 
+.chat-input {
+  display: flex;
+}
+
 .chat-input input {
-  width: 100%;
+  flex: 1;
   box-sizing: border-box;
 }
 
