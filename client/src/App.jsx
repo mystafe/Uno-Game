@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 import pkg from '../package.json';
@@ -6,6 +6,9 @@ import pkg from '../package.json';
 // Use a configurable server URL to support both local and deployed environments
 const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 const socket = io(serverUrl);
+
+const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
+const COLORS = ['red', 'yellow', 'green', 'blue'];
 
 const translations = {
   en: {
@@ -30,16 +33,16 @@ const translations = {
     notYourTurn: 'Not your turn',
     nameTaken: 'Name already used',
     chooseColor: 'Choose a color',
-    sort: 'Sort Cards',
     noSpecialFinish: 'You cannot finish with a special card',
     colors: { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue', wild: 'Wild' },
     values: { skip: 'Skip', reverse: 'Reverse', draw2: 'Draw 2', wild: 'Wild', wild4: 'Wild +4', swap: 'Swap Hands' },
     viewing: 'Viewing',
     follow: 'Follow turn',
     leave: 'Leave Game',
+    shareGame: 'Share Game',
     started: 'started',
     watch: 'Watch',
-    newLobby: 'New Lobby',
+    newLobby: 'New Room',
     create: 'Create',
     developedBy: 'Developed by Mustafa Evleksiz',
     english: 'English',
@@ -47,9 +50,10 @@ const translations = {
     winner: 'Winner',
     wins: 'wins!',
     choosePlayer: 'Choose a player',
-    activeLobbies: 'Active Lobbies',
+    activeLobbies: 'Active Rooms',
     chat: 'Chat',
     emptyRooms: 'Empty All Rooms',
+    new: 'New',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -73,16 +77,16 @@ const translations = {
     notYourTurn: 'Sıra sizde değil',
     nameTaken: 'Bu isim zaten kullanılıyor',
     chooseColor: 'Renk seçin',
-    sort: 'Kartları sırala',
     noSpecialFinish: 'Özel kart ile oyunu bitiremezsiniz',
     colors: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi', wild: 'Özel' },
     values: { skip: 'Atla', reverse: 'Yön Değiştir', draw2: 'Çek 2', wild: 'Joker', wild4: 'Çek 4 Joker', swap: 'El Değiştir' },
     viewing: 'İzlenen',
     follow: 'Sıradakini izle',
     leave: 'Oyundan Ayrıl',
+    shareGame: 'Oyunu Paylaş',
     started: 'başladı',
     watch: 'İzle',
-    newLobby: 'Yeni Lobby',
+    newLobby: 'Yeni Oda',
     create: 'Oluştur',
     developedBy: 'Mustafa Evleksiz tarafından geliştirilmiştir',
     english: 'İngilizce',
@@ -90,16 +94,17 @@ const translations = {
     winner: 'Kazanan',
     wins: 'kazandı!',
     choosePlayer: 'Bir oyuncu seçin',
-    activeLobbies: 'Aktif Lobbiler',
+    activeLobbies: 'Aktif Odalar',
     chat: 'Sohbet',
     emptyRooms: 'Tüm Odaları Boşalt',
+    new: 'Yeni',
   },
 };
 
 function App() {
   const [id, setId] = useState('');
   const [name, setName] = useState('');
-  const params = new URLSearchParams(window.location.search);
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialRoom = params.get('room') || 'lobby';
   const [room, setRoom] = useState(initialRoom);
   const [joined, setJoined] = useState(false);
@@ -112,18 +117,16 @@ function App() {
   const [lobbies, setLobbies] = useState([]);
   const [toast, setToast] = useState('');
   const [actionPending, setActionPending] = useState(false);
-  const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
-  const COLORS = ['red', 'yellow', 'green', 'blue'];
   const [colorPicker, setColorPicker] = useState(null);
   const [swapPicker, setSwapPicker] = useState(null);
   const [watching, setWatching] = useState(null);
   const [follow, setFollow] = useState(true);
-  const [sorted, setSorted] = useState(false);
+  const [newCards, setNewCards] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [chatMsg, setChatMsg] = useState('');
   const [admin, setAdmin] = useState(false);
-  const [titleClicks, setTitleClicks] = useState(0);
+  const [, setTitleClicks] = useState(0);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
@@ -183,31 +186,37 @@ function App() {
     } else {
       const me = state?.players.find(p => p.id === id);
       if (me) {
-        if (sorted) {
-          setHand(h => {
-            const serverHand = [...me.hand];
-            const existing = [...h];
-            const counts = serverHand.map(c => JSON.stringify(c));
-            const result = [];
-            existing.forEach(card => {
-              const key = JSON.stringify(card);
-              const idx = counts.indexOf(key);
-              if (idx !== -1) {
-                result.push(card);
-                counts[idx] = null;
-              }
-            });
-            counts.forEach((key, idx) => {
-              if (key !== null) result.push(serverHand[idx]);
-            });
-            return result;
+        setHand(prev => {
+          const sortFn = (a, b) => colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color);
+          const sortedHand = [...me.hand].sort(sortFn);
+          const prevCounts = prev.reduce((acc, c) => {
+            const key = JSON.stringify(c);
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          }, {});
+          const newOnes = [];
+          sortedHand.forEach(card => {
+            const key = JSON.stringify(card);
+            if (prevCounts[key]) {
+              prevCounts[key]--;
+            } else {
+              newOnes.push(key);
+            }
           });
-        } else {
-          setHand([...me.hand]);
-        }
+          if (newOnes.length) {
+            setNewCards(cards => Array.from(new Set([...cards, ...newOnes])));
+          }
+          return sortedHand;
+        });
       }
     }
-  }, [state, id, spectator, follow, sorted]);
+  }, [state, id, spectator, follow]);
+
+  useEffect(() => {
+    if (state?.current !== id) {
+      setNewCards([]);
+    }
+  }, [state, id]);
 
   const joinLobby = (r) => {
     if (!name) return;
@@ -215,7 +224,6 @@ function App() {
     socket.emit('join', { room: r, name });
     localStorage.setItem('unoGame', JSON.stringify({ room: r, name }));
     setJoined(true);
-    setSorted(false);
   };
 
   const createLobby = () => {
@@ -223,7 +231,6 @@ function App() {
     socket.emit('join', { room, name, create: true });
     localStorage.setItem('unoGame', JSON.stringify({ room, name }));
     setJoined(true);
-    setSorted(false);
   };
 
   const start = () => {
@@ -317,11 +324,6 @@ function App() {
     performPlay(card, idx, targetId);
   };
 
-  const sortHand = () => {
-    setHand(h => [...h].sort((a, b) => colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)));
-    setSorted(true);
-  };
-
   const draw = () => {
     if (!myTurn) {
       showToast(t('notYourTurn'));
@@ -347,7 +349,6 @@ function App() {
     localStorage.removeItem('unoGame');
     setJoined(false);
     setState(null);
-    setSorted(false);
   };
 
   useEffect(() => {
@@ -369,7 +370,7 @@ function App() {
     } else if (urlRoom) {
       setRoom(urlRoom);
     }
-  }, []);
+  }, [params]);
 
   const viewingPlayer = spectator
     ? state?.players.find(p => p.id === watching)
@@ -403,7 +404,17 @@ function App() {
   } else if (!state || !state.started) {
     content = (
       <div className="lobby">
-        <h2>{t('roomHeading')}: {room} <button className="share-btn" onClick={() => shareRoom(room)}>🔗</button></h2>
+        <h2>
+          {t('roomHeading')}: {room}{' '}
+          <button
+            className="share-btn"
+            onClick={() => shareRoom(room)}
+            title={t('shareGame')}
+            aria-label={t('shareGame')}
+          >
+            📤
+          </button>
+        </h2>
         {state?.winner && <h3>{t('winner')}: {state.players.find(p => p.id === state.winner)?.name}</h3>}
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
@@ -428,7 +439,17 @@ function App() {
           </div>
           <span className="top-label">{colorText(state.top.color)} {displayValue(state.top.value)}</span>
         </div>
-        <h3>{t('turn')}: {state.players.find(p => p.id === state.current)?.name} <button className="share-btn" onClick={() => shareRoom(room)}>🔗</button></h3>
+        <h3>
+          {t('turn')}: {state.players.find(p => p.id === state.current)?.name}{' '}
+          <button
+            className="share-btn"
+            onClick={() => shareRoom(room)}
+            title={t('shareGame')}
+            aria-label={t('shareGame')}
+          >
+            📤
+          </button>
+        </h3>
         {spectator ? (
           <>
             <h3>{t('viewing')}: {viewingPlayer?.name}</h3>
@@ -451,15 +472,32 @@ function App() {
               aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
             >
               {cardIcons[c.value] || c.value}
+              {newCards.includes(JSON.stringify(c)) && myTurn && (
+                <span className="new-badge">{t('new')}</span>
+              )}
               <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
             </button>
           ))}
         </div>
         {!spectator && (
           <div className="game-actions">
-            <button className="draw-btn" onClick={draw} disabled={!myTurn || actionPending}>{t('draw')}</button>
-            <button className="sort-btn" onClick={sortHand}>{t('sort')}</button>
-            <button className="leave-btn" onClick={leaveGame}>{t('leave')}</button>
+            <button className="draw-btn" onClick={draw} disabled={!myTurn || actionPending}>🃏 {t('draw')}</button>
+            <button
+              className="share-btn"
+              onClick={() => shareRoom(room)}
+              title={t('shareGame')}
+              aria-label={t('shareGame')}
+            >
+              📤
+            </button>
+            <button
+              className="leave-btn"
+              onClick={leaveGame}
+              title={t('leave')}
+              aria-label={t('leave')}
+            >
+              🚪
+            </button>
           </div>
         )}
         <h3>{t('players')}</h3>
