@@ -48,6 +48,13 @@
   cursor: default;
 }
 
+.card.top {
+  width: 60px;
+  height: 90px;
+  font-size: 1.5rem;
+  cursor: default;
+}
+
 .top-area {
   display: flex;
   flex-direction: column;
@@ -55,6 +62,11 @@
   gap: 0.5rem;
   margin-bottom: 1rem;
   perspective: 600px;
+}
+
+.penalty-info {
+  font-size: 0.9rem;
+  color: #fff;
 }
 
 .card:hover:not(:disabled) {
@@ -101,13 +113,21 @@
 }
 
 @keyframes playCard {
-  0% { transform: translateY(0) scale(1) rotate(0deg); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
-  50% { transform: translateY(-30px) scale(1.1) rotate(-15deg); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5); }
-  100% { transform: translateY(-30px) scale(1) rotate(0deg); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
+  from { transform: translate(0,0) scale(1); opacity: 1; }
+  to { transform: translate(-40px,-80px) scale(0.8); opacity: 0.5; }
 }
 
 .card.playing {
-  animation: playCard 0.5s ease forwards;
+  animation: playCard 0.8s ease forwards;
+}
+
+@keyframes drawCard {
+  from { transform: translateY(-20px) scale(0.8); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.card.drawn {
+  animation: drawCard 0.5s ease;
 }
 
 @keyframes flipCard {
@@ -209,6 +229,10 @@
   position: relative;
   display: inline-block;
   cursor: default;
+  font-family: 'Trebuchet MS', sans-serif;
+  background: linear-gradient(45deg, #e74c3c, #f1c40f, #27ae60, #3498db);
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 .app-title::after {
@@ -266,6 +290,14 @@
   background: rgba(0, 0, 0, 0.4);
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
+}
+
+.players li .mini-btn {
+  margin-left: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #fff;
 }
 
 .spectators li {

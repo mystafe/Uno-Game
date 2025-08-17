@@ -115,7 +115,7 @@ function App() {
   const [room, setRoom] = useState(initialRoom);
   const [joined, setJoined] = useState(false);
   const [state, setState] = useState(null);
-  const [ai, setAi] = useState(false);
+  const [aiCount, setAiCount] = useState(0);
   const [lang, setLang] = useState('tr');
   const [playingIndex, setPlayingIndex] = useState(null);
   const [hand, setHand] = useState([]);
@@ -265,7 +265,7 @@ function App() {
   };
 
   const start = () => {
-    socket.emit('start', { room, ai, options: { stacking, multi } });
+    socket.emit('start', { room, aiCount, options: { stacking, multi } });
   };
 
   const shareRoom = (r) => {
@@ -348,7 +348,7 @@ function App() {
       });
       socket.emit('play', { room, cards, target });
       setPlayingIndex(null);
-    }, 500);
+    }, 800);
   };
 
   const attemptPlay = () => {
@@ -430,6 +430,14 @@ function App() {
     setActionPending(true);
     setSelected([]);
     socket.emit('draw', { room });
+  };
+
+  const makeComputer = (playerId) => {
+    socket.emit('makeAI', { room, target: playerId });
+  };
+
+  const kickPlayer = (playerId) => {
+    socket.emit('kick', { room, target: playerId });
   };
 
   const onDragStart = (index) => setDragIndex(index);
@@ -519,8 +527,8 @@ function App() {
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
         </ul>
         <label>
-          <input type="checkbox" checked={ai} onChange={e => setAi(e.target.checked)} />
           {t('addComputer')}
+          <input type="number" min="0" value={aiCount} onChange={e => setAiCount(parseInt(e.target.value,10) || 0)} />
         </label>
         {admin && (
           <>
@@ -547,11 +555,16 @@ function App() {
         <div className="top-area">
           <h2>{t('topCard')}</h2>
           <div
-            className={`card ${state.top.color} small ${topChanging ? 'flipping' : ''}`}
+            className={`card ${state.top.color} top ${topChanging ? 'flipping' : ''}`}
             aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
           >
             {cardIcons[state.top.value] || state.top.value}
           </div>
+          {state.pendingDraw > 0 && (
+            <p className="penalty-info">
+              {`${colorText(state.top.color)} ${valueText(state.top.value)} (${state.pendingDraw} ${lang === 'tr' ? 'kart ceza' : 'card penalty'})`}
+            </p>
+          )}
         </div>
         <h3>
           {t('turn')}: {state.players.find(p => p.id === state.current)?.name}
@@ -587,7 +600,7 @@ function App() {
             return (
               <button
                 key={idx}
-                className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass} ${selected.includes(idx) ? 'selected' : ''}`}
+                className={`card ${c.color} ${playingIndex === idx ? 'playing' : ''} ${playClass} ${isNew ? 'drawn' : ''} ${selected.includes(idx) ? 'selected' : ''}`}
                 onClick={spectator ? undefined : () => handleCardClick(c, idx)}
                 disabled={spectator || !myTurn || actionPending}
                 draggable={!spectator}
@@ -635,6 +648,12 @@ function App() {
               onClick={spectator ? () => { setWatching(p.id); setFollow(false); } : undefined}
             >
               {p.name}: {p.hand.length} {t('cards')}
+              {admin && p.id !== id && (
+                <>
+                  <button className="mini-btn" onClick={() => makeComputer(p.id)}>🤖</button>
+                  <button className="mini-btn" onClick={() => kickPlayer(p.id)}>✖️</button>
+                </>
+              )}
             </li>
           ))}
         </ul>
