@@ -138,9 +138,11 @@ function App() {
   const [selected, setSelected] = useState([]);
   const [stacking, setStacking] = useState(true);
   const [multi, setMulti] = useState(true);
+  const [topChanging, setTopChanging] = useState(false);
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
+  const topCard = state?.top;
 
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
   const colorText = (color) => translations[lang].colors[color] || color;
@@ -235,6 +237,17 @@ function App() {
       setNewCards([]);
     }
   }, [state, id]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [hand]);
+
+  useEffect(() => {
+    if (!topCard) return;
+    setTopChanging(true);
+    const timeout = setTimeout(() => setTopChanging(false), 500);
+    return () => clearTimeout(timeout);
+  }, [topCard]);
 
   const joinLobby = (r) => {
     if (!name) return;
@@ -335,7 +348,7 @@ function App() {
       });
       socket.emit('play', { room, cards, target });
       setPlayingIndex(null);
-    }, 400);
+    }, 500);
   };
 
   const attemptPlay = () => {
@@ -534,7 +547,7 @@ function App() {
         <div className="top-area">
           <h2>{t('topCard')}</h2>
           <div
-            className={`card ${state.top.color} small`}
+            className={`card ${state.top.color} small ${topChanging ? 'flipping' : ''}`}
             aria-label={`${colorText(state.top.color)} ${valueText(state.top.value)}`}
           >
             {cardIcons[state.top.value] || state.top.value}
