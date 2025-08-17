@@ -15,7 +15,7 @@ const translations = {
     joinGame: 'Join Game',
     name: 'Name',
     room: 'Room',
-    addComputer: 'Add Computer',
+    addAI: 'Add AI Player',
     join: 'Join',
     roomHeading: 'Room',
     start: 'Start',
@@ -53,7 +53,8 @@ const translations = {
     choosePlayer: 'Choose a player',
     activeLobbies: 'Active Rooms',
     chat: 'Chat',
-    emptyRooms: 'Empty All Rooms',
+    emptyRooms: 'End Sessions',
+    aiPlayer: 'AI Player',
     new: 'New',
     stacking: 'Stacking',
     multiPlay: 'Multi Play',
@@ -62,7 +63,7 @@ const translations = {
     joinGame: 'Oyuna Katıl',
     name: 'İsim',
     room: 'Oda',
-    addComputer: 'Bilgisayar Ekle',
+    addAI: 'AI oyuncu ekle',
     join: 'Katıl',
     roomHeading: 'Oda',
     start: 'Başlat',
@@ -100,7 +101,8 @@ const translations = {
     choosePlayer: 'Bir oyuncu seçin',
     activeLobbies: 'Aktif Odalar',
     chat: 'Sohbet',
-    emptyRooms: 'Tüm Odaları Boşalt',
+    emptyRooms: 'Oturumları Sonlandır',
+    aiPlayer: 'AI oyuncu',
     new: 'Yeni',
     stacking: 'Katlama',
     multiPlay: 'Çoklu Oynama',
@@ -432,7 +434,7 @@ function App() {
     socket.emit('draw', { room });
   };
 
-  const makeComputer = (playerId) => {
+  const makeAI = (playerId) => {
     socket.emit('makeAI', { room, target: playerId });
   };
 
@@ -525,11 +527,11 @@ function App() {
         {state?.winner && <h3>{t('winner')}: {state.players.find(p => p.id === state.winner)?.name}</h3>}
         <ul>
           {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
+          {Array.from({ length: aiCount }).map((_, i) => (
+            <li key={`ai-${i}`}>{`${t('aiPlayer')} ${i + 1}`}</li>
+          ))}
         </ul>
-        <label>
-          {t('addComputer')}
-          <input type="number" min="0" value={aiCount} onChange={e => setAiCount(parseInt(e.target.value,10) || 0)} />
-        </label>
+        <button onClick={() => setAiCount(c => c + 1)}>{t('addAI')}</button>
         {admin && (
           <>
             <label>
@@ -609,10 +611,8 @@ function App() {
                 onDrop={spectator ? undefined : () => onDrop(idx)}
                 aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
               >
+                {isNew && <span className="new-banner">{t('new')}</span>}
                 {cardIcons[c.value] || c.value}
-                {isNew && (
-                  <span className="new-badge">{t('new')}</span>
-                )}
                 <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
               </button>
             );
@@ -650,7 +650,7 @@ function App() {
               {p.name}: {p.hand.length} {t('cards')}
               {admin && p.id !== id && (
                 <>
-                  <button className="mini-btn" onClick={() => makeComputer(p.id)}>🤖</button>
+                  <button className="mini-btn" onClick={() => makeAI(p.id)}>🤖</button>
                   <button className="mini-btn" onClick={() => kickPlayer(p.id)}>✖️</button>
                 </>
               )}
