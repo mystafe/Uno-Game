@@ -33,7 +33,11 @@ io.on('connection', socket => {
       return socket.emit('joinError', 'nameTaken');
     }
     if (!game.addPlayer(socket.id, name)) {
-      return socket.emit('joinError', 'notfound');
+      if (game.started) {
+        game.addSpectator(socket.id, name);
+      } else {
+        return socket.emit('joinError', 'notfound');
+      }
     }
     socket.join(room);
     io.to(room).emit('state', game.getState());
@@ -72,10 +76,16 @@ io.on('connection', socket => {
 
   socket.on('leave', ({ room }) => {
     const game = games[room];
-    if (game && game.replaceWithAI(socket.id)) {
-      socket.leave(room);
-      io.to(room).emit('state', game.getState());
-      game.checkAI(io, room);
+    if (game) {
+      if (game.replaceWithAI(socket.id)) {
+        socket.leave(room);
+        io.to(room).emit('state', game.getState());
+        game.checkAI(io, room);
+      } else {
+        game.removeSpectator(socket.id);
+        socket.leave(room);
+        io.to(room).emit('state', game.getState());
+      }
     }
     io.emit('lobbies', getLobbies());
   });
@@ -84,12 +94,25 @@ io.on('connection', socket => {
     Object.keys(games).forEach(room => {
       const game = games[room];
       game.disconnectPlayer(socket.id);
+      game.removeSpectator(socket.id);
       if (game.isEmpty()) {
         delete games[room];
       } else {
         io.to(room).emit('state', game.getState());
         game.checkAI(io, room);
       }
+    });
+    io.emit('lobbies', getLobbies());
+  });
+
+  socket.on('chat', ({ room, name, message }) => {
+    io.to(room).emit('chat', { name, message });
+  });
+
+  socket.on('emptyRooms', () => {
+    Object.keys(games).forEach(r => {
+      io.to(r).emit('state', { started: false, players: [], spectators: [], current: null, top: null, winner: null });
+      delete games[r];
     });
     io.emit('lobbies', getLobbies());
   });
