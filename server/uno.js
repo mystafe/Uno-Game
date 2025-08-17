@@ -39,6 +39,15 @@ class Game {
     this.options = { stacking: true, multi: true };
   }
 
+  nextAIName() {
+    const base = 'Bilgisayar';
+    const names = this.players.map(p => p.name).filter(n => n.startsWith(base));
+    if (!names.length) return base;
+    let n = 2;
+    while (names.includes(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+  }
+
   addPlayer(id, name) {
     const existing = this.players.find(p => p.name.toLowerCase() === name.toLowerCase());
     if (existing) {
@@ -84,7 +93,7 @@ class Game {
       p.hand = this.deck.splice(0, 7);
     });
     if (ai) {
-      const aiPlayer = { id: `AI-${Date.now()}`, name: 'Bilgisayar', hand: this.deck.splice(0, 7), ai: true };
+      const aiPlayer = { id: `AI-${Date.now()}`, name: this.nextAIName(), hand: this.deck.splice(0, 7), ai: true };
       this.players.push(aiPlayer);
     }
     let first = this.drawCard();
@@ -228,7 +237,7 @@ class Game {
     const player = this.players.find(p => p.id === id);
     if (!player) return false;
     player.id = `AI-${id}`;
-    player.name = `${player.name} (pc)`;
+    player.name = this.nextAIName();
     player.ai = true;
     return true;
   }
