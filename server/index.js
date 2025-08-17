@@ -86,7 +86,15 @@ io.on('connection', socket => {
 
   socket.on('kick', ({ room, target }) => {
     const game = games[room];
-    if (game && game.replaceWithAI(target)) {
+    if (!game) return;
+    if (target.startsWith('AI-')) {
+      game.removePlayer(target);
+      io.to(room).emit('state', game.getState());
+      game.checkAI(io, room);
+      if (!game.started) io.emit('lobbies', getLobbies());
+      return;
+    }
+    if (game.replaceWithAI(target)) {
       const targetSocket = io.sockets.sockets.get(target);
       if (targetSocket) targetSocket.leave(room);
       io.to(room).emit('state', game.getState());
