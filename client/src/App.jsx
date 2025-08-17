@@ -211,7 +211,7 @@ function App() {
             }
           });
           if (prev.length !== 0 && newOnes.length) {
-            setNewCards(cards => Array.from(new Set([...cards, ...newOnes])));
+            setNewCards(cards => [...cards, ...newOnes]);
           }
           return sortedHand;
         });
@@ -323,7 +323,14 @@ function App() {
       showToast(t('noSpecialFinish'));
       return;
     }
-    setNewCards(cards => cards.filter(c => c !== JSON.stringify(card)));
+    setNewCards(cards => {
+      const key = JSON.stringify(card);
+      const idx = cards.indexOf(key);
+      if (idx === -1) return cards;
+      const updated = [...cards];
+      updated.splice(idx, 1);
+      return updated;
+    });
     if (card.color === 'wild') {
       setColorPicker({ card, idx });
       return;
@@ -453,6 +460,10 @@ function App() {
       </div>
     );
   } else {
+    const newCounts = {};
+    newCards.forEach(k => {
+      newCounts[k] = (newCounts[k] || 0) + 1;
+    });
     content = (
       <div className="game">
         <div className="top-area">
@@ -486,8 +497,11 @@ function App() {
         )}
         <div className="hand">
           {displayHand.map((c, idx) => {
+            const key = JSON.stringify(c);
             const canPlayCard = c.color === 'wild' || c.color === state.top.color || c.value === state.top.value;
             const playClass = myTurn ? (canPlayCard ? 'playable' : 'unplayable') : '';
+            const isNew = myTurn && newCounts[key] > 0;
+            if (isNew) newCounts[key]--;
             return (
               <button
                 key={idx}
@@ -501,7 +515,7 @@ function App() {
                 aria-label={`${colorText(c.color)} ${valueText(c.value)}`}
               >
                 {cardIcons[c.value] || c.value}
-                {newCards.includes(JSON.stringify(c)) && myTurn && (
+                {isNew && (
                   <span className="new-badge">{t('new')}</span>
                 )}
                 <span className="tooltip">{`${colorText(c.color)} ${displayValue(c.value)}`}</span>
