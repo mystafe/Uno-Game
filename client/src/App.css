@@ -78,6 +78,10 @@
   filter: brightness(0.7);
 }
 
+.card.selected {
+  transform: translateY(-15px);
+}
+
 .card .tooltip {
   visibility: hidden;
   background: rgba(0, 0, 0, 0.8);
