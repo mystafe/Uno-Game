@@ -33,7 +33,7 @@ class Game {
     this.started = false;
     this.discard = [];
     this.deck = [];
-    this.ai = null;
+    this.aiTimeout = null;
     this.winner = null;
     this.pendingDraw = 0;
     this.options = { stacking: true, multi: true };
@@ -250,34 +250,40 @@ class Game {
   checkAI(io, room) {
     const player = this.currentPlayer();
     if (!player || !player.ai) return;
-    const priority = { wild4: 5, draw2: 4, skip: 3, reverse: 2, swap: 2, wild: 1 };
-    const playable = player.hand.filter(c => c && this.canPlay(c));
-    if (playable.length) {
-      playable.sort((a, b) => (priority[b.value] || 0) - (priority[a.value] || 0));
-      let card = playable[0];
-      if (player.hand.length === 1 && (card.color === 'wild' || typeof card.value !== 'number')) {
-        const numeric = playable.find(c => typeof c.value === 'number');
-        if (numeric) card = numeric;
-        else {
-          this.draw(player.id);
-          io.to(room).emit('state', this.getState());
-          if (this.started) this.checkAI(io, room);
-          return;
+    if (this.aiTimeout) clearTimeout(this.aiTimeout);
+    this.aiTimeout = setTimeout(() => {
+      this.aiTimeout = null;
+      const player = this.currentPlayer();
+      if (!player || !player.ai) return;
+      const priority = { wild4: 5, draw2: 4, skip: 3, reverse: 2, swap: 2, wild: 1 };
+      const playable = player.hand.filter(c => c && this.canPlay(c));
+      if (playable.length) {
+        playable.sort((a, b) => (priority[b.value] || 0) - (priority[a.value] || 0));
+        let card = playable[0];
+        if (player.hand.length === 1 && (card.color === 'wild' || typeof card.value !== 'number')) {
+          const numeric = playable.find(c => typeof c.value === 'number');
+          if (numeric) card = numeric;
+          else {
+            this.draw(player.id);
+            io.to(room).emit('state', this.getState());
+            if (this.started) this.checkAI(io, room);
+            return;
+          }
         }
+        if (card.color === 'wild') {
+          const colorCounts = COLORS.map(color => ({
+            color,
+            count: player.hand.filter(c => c.color === color).length,
+          })).sort((a, b) => b.count - a.count);
+          card = { ...card, chosenColor: colorCounts[0].color };
+        }
+        this.play(player.id, card);
+      } else {
+        this.draw(player.id);
       }
-      if (card.color === 'wild') {
-        const colorCounts = COLORS.map(color => ({
-          color,
-          count: player.hand.filter(c => c.color === color).length,
-        })).sort((a, b) => b.count - a.count);
-        card = { ...card, chosenColor: colorCounts[0].color };
-      }
-      this.play(player.id, card);
-    } else {
-      this.draw(player.id);
-    }
-    io.to(room).emit('state', this.getState());
-    if (this.started) this.checkAI(io, room);
+      io.to(room).emit('state', this.getState());
+      if (this.started) this.checkAI(io, room);
+    }, 1000);
   }
 
   getState() {
