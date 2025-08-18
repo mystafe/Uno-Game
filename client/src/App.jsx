@@ -50,6 +50,7 @@ const translations = {
     turkish: 'Turkish',
     winner: 'Winner',
     wins: 'wins!',
+    restart: 'Restart',
     choosePlayer: 'Choose a player',
     activeLobbies: 'Active Rooms',
     chat: 'Chat',
@@ -98,6 +99,7 @@ const translations = {
     turkish: 'Türkçe',
     winner: 'Kazanan',
     wins: 'kazandı!',
+    restart: 'Yeniden Başla',
     choosePlayer: 'Bir oyuncu seçin',
     activeLobbies: 'Aktif Odalar',
     chat: 'Sohbet',
@@ -759,7 +761,8 @@ function App() {
       )}
       {state?.winner && (
         <div className="winner-banner">
-          {state.players.find(p => p.id === state.winner)?.name} {t('wins')}
+          <p>{state.players.find(p => p.id === state.winner)?.name} {t('wins')}</p>
+          <button onClick={start}>{t('restart')}</button>
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
