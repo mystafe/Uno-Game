@@ -10,6 +10,28 @@ const socket = io(serverUrl);
 const colorOrder = ['red', 'yellow', 'green', 'blue', 'wild'];
 const COLORS = ['red', 'yellow', 'green', 'blue'];
 
+// Enhanced card sorting system
+const sortCards = (cards) => {
+  const sortedCards = [...cards];
+  return sortedCards.sort((a, b) => {
+    const colorA = colorOrder.indexOf(a.color);
+    const colorB = colorOrder.indexOf(b.color);
+    if (colorA !== colorB) return colorA - colorB;
+    return getValueOrder(a.value) - getValueOrder(b.value);
+  });
+};
+
+const getValueOrder = (value) => {
+  if (typeof value === 'number') return value;
+  const specialOrder = ['skip', 'reverse', 'draw2', 'wild', 'wild4', 'swap'];
+  return specialOrder.indexOf(value) + 10; // Special cards come after numbers
+};
+
+const getSpecialCardOrder = (value) => {
+  const specialOrder = ['skip', 'reverse', 'draw2', 'wild', 'wild4', 'swap'];
+  return specialOrder.indexOf(value);
+};
+
 const translations = {
   en: {
     joinGame: 'Join Game',
@@ -59,6 +81,17 @@ const translations = {
     new: 'New',
     stacking: 'Stacking',
     multiPlay: 'Multi Play',
+    autoSort: 'Auto Sort',
+    sortBy: 'Sort By',
+    sortColor: 'Color',
+    sortValue: 'Value',
+    sortSmart: 'Smart',
+    makeAI: 'Make AI',
+    kickPlayer: 'Kick Player',
+    removeAI: 'Remove AI',
+    clearAllLobbies: 'Clear All Lobbies',
+    clearAllLobbiesConfirm: 'Are you sure you want to clear all lobbies?',
+    clearAllLobbiesSuccess: 'All lobbies cleared',
   },
   tr: {
     joinGame: 'Oyuna Katıl',
@@ -108,6 +141,17 @@ const translations = {
     new: 'Yeni',
     stacking: 'Katlama',
     multiPlay: 'Çoklu Oynama',
+    autoSort: 'Otomatik Sıralama',
+    sortBy: 'Sıralama',
+    sortColor: 'Renk',
+    sortValue: 'Değer',
+    sortSmart: 'Akıllı',
+    makeAI: 'AI Yap',
+    kickPlayer: 'Oyuncuyu At',
+    removeAI: 'AI Kaldır',
+    clearAllLobbies: 'Tüm Lobileri Temizle',
+    clearAllLobbiesConfirm: 'Tüm lobileri temizlemek istediğinize emin misiniz?',
+    clearAllLobbiesSuccess: 'Tüm lobiler temizlendi',
   },
 };
 
@@ -120,7 +164,14 @@ function App() {
   const [joined, setJoined] = useState(false);
   const [state, setState] = useState(null);
   const [aiCount, setAiCount] = useState(0);
-  const [lang, setLang] = useState('tr');
+  // Detect browser language and set default
+  const getBrowserLanguage = () => {
+    const browserLang = navigator.language || navigator.languages?.[0] || 'en';
+    // Check if browser language starts with 'tr' for Turkish
+    return browserLang.startsWith('tr') ? 'tr' : 'en';
+  };
+  
+  const [lang, setLang] = useState(getBrowserLanguage);
   const [playingIndex, setPlayingIndex] = useState(null);
   const [hand, setHand] = useState([]);
   const [dragIndex, setDragIndex] = useState(null);
@@ -135,8 +186,16 @@ function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [chatMsg, setChatMsg] = useState('');
-  const [admin, setAdmin] = useState(false);
-  const [, setTitleClicks] = useState(0);
+  // Load admin state from localStorage (default to false)
+  const [admin, setAdmin] = useState(() => {
+    try {
+      const saved = localStorage.getItem('unoGameAdmin');
+      return saved === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
+  const [titleClicks, setTitleClicks] = useState(0);
   const chatBoxRef = useRef(null);
   const chatToggleRef = useRef(null);
   const [selected, setSelected] = useState([]);
@@ -144,6 +203,8 @@ function App() {
   const [multi, setMulti] = useState(true);
   const [aiPlaying, setAiPlaying] = useState(false);
   const [displayTop, setDisplayTop] = useState(null);
+  const [autoSort, setAutoSort] = useState(true);
+  const [sortType, setSortType] = useState('color');
   const prevStateRef = useRef(null);
   const topCardRef = useRef(null);
   const topTextRef = useRef(null);
@@ -151,6 +212,8 @@ function App() {
 
   const myTurn = state?.current === id;
   const spectator = state ? !state.players.some(p => p.id === id) : false;
+
+
 
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
   const colorText = (color) => translations[lang].colors[color] || color;
@@ -166,7 +229,7 @@ function App() {
 
   const showToast = (msg) => {
     setToast(msg);
-    setTimeout(() => setToast(''), 3000);
+    setTimeout(() => setToast(''), 5000);
   };
 
   useEffect(() => {
@@ -214,8 +277,8 @@ function App() {
       const me = state?.players.find(p => p.id === id);
       if (me) {
         setHand(prev => {
-          const sortFn = (a, b) => colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color);
-          const sortedHand = [...me.hand].sort(sortFn);
+          // Use smart sorting if auto-sort is enabled
+          const sortedHand = autoSort ? sortCards(me.hand) : [...me.hand];
           const prevCounts = prev.reduce((acc, c) => {
             const key = JSON.stringify(c);
             acc[key] = (acc[key] || 0) + 1;
@@ -363,17 +426,38 @@ function App() {
   const handleTitleClick = () => {
     setTitleClicks(c => {
       const nc = c + 1;
-      if (nc >= 5) {
-        setAdmin(a => !a);
+      if (nc >= 3) {
+        const newAdmin = !admin;
+        setAdmin(newAdmin);
+        localStorage.setItem('unoGameAdmin', newAdmin.toString());
+        showToast(newAdmin ? 'Admin mode enabled' : 'Admin mode disabled');
         return 0;
       }
       return nc;
     });
   };
 
+  // Reset click counter after 3 seconds of inactivity
+  useEffect(() => {
+    if (titleClicks > 0 && titleClicks < 3) {
+      const timer = setTimeout(() => {
+        setTitleClicks(0);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [titleClicks]);
+
   const emptyRooms = () => {
     socket.emit('emptyRooms');
   };
+
+  const clearAllLobbies = () => {
+    if (window.confirm(t('clearAllLobbiesConfirm'))) {
+      socket.emit('clearAllLobbies');
+      showToast(t('clearAllLobbiesSuccess'));
+    }
+  };
+
 
   const performPlay = (cards, indices, target) => {
     const cardEl = cardRefs.current[indices[0]];
@@ -497,14 +581,27 @@ function App() {
     socket.emit('kick', { room, target: playerId });
   };
 
+  const removeAI = (aiIndex) => {
+    setAiCount(c => Math.max(0, c - 1));
+  };
+
   const onDragStart = (index) => setDragIndex(index);
   const onDrop = (index) => {
     if (dragIndex === null) return;
     const newHand = [...hand];
     const [moved] = newHand.splice(dragIndex, 1);
     newHand.splice(index, 0, moved);
-    setHand(newHand);
+    
+    // Auto-sort after drag if enabled
+    const finalHand = autoSort ? sortCards(newHand) : newHand;
+    setHand(finalHand);
     setDragIndex(null);
+  };
+
+  const manualSort = () => {
+    if (autoSort) {
+      setHand(sortCards(hand));
+    }
   };
 
   const leaveGame = () => {
@@ -545,10 +642,12 @@ function App() {
   if (!joined) {
     content = (
       <div className="join">
-        <select className="lang-select" value={lang} onChange={e => setLang(e.target.value)}>
-          <option value="tr">{t('turkish')}</option>
-          <option value="en">{t('english')}</option>
-        </select>
+        <div className="language-selector">
+          <select className="lang-select" value={lang} onChange={e => setLang(e.target.value)}>
+            <option value="tr">{t('turkish')}</option>
+            <option value="en">{t('english')}</option>
+          </select>
+        </div>
         <h2>{t('joinGame')}</h2>
         <input placeholder={t('name')} value={name} onChange={e => setName(e.target.value)} />
         <h3>{t('activeLobbies')}</h3>
@@ -580,25 +679,55 @@ function App() {
           </button>
         </h2>
         {state?.winner && <h3>{t('winner')}: {state.players.find(p => p.id === state.winner)?.name}</h3>}
-        <ul>
-          {state?.players.map(p => <li key={p.id}>{p.name}</li>)}
+        <ul className="players">
+          {state?.players.map(p => (
+            <li key={p.id} className="player-item">
+              {p.name}
+              {admin && p.id !== id && (
+                <>
+                  <button className="mini-btn" onClick={() => makeAI(p.id)} title={t('makeAI')}>🤖</button>
+                  <button className="mini-btn" onClick={() => kickPlayer(p.id)} title={t('kickPlayer')}>✖️</button>
+                </>
+              )}
+            </li>
+          ))}
           {Array.from({ length: aiCount }).map((_, i) => (
-            <li key={`ai-${i}`}>{`${t('aiPlayer')} ${i + 1}`}</li>
+            <li key={`ai-${i}`} className="player-item ai-player">
+              {`${t('aiPlayer')} ${i + 1}`}
+              {admin && (
+                <button className="mini-btn" onClick={() => removeAI(i)} title={t('removeAI')}>➖</button>
+              )}
+            </li>
           ))}
         </ul>
         <button onClick={() => setAiCount(c => c + 1)}>{t('addAI')}</button>
         {admin && (
-          <>
-            <label>
-              <input type="checkbox" checked={stacking} onChange={e => setStacking(e.target.checked)} />
-              {t('stacking')}
-            </label>
-            <label>
-              <input type="checkbox" checked={multi} onChange={e => setMulti(e.target.checked)} />
-              {t('multiPlay')}
-            </label>
-          </>
+          <div className="admin-lobby-controls">
+            <h4>Admin Controls</h4>
+            <div className="admin-buttons">
+              <button className="admin-btn" onClick={emptyRooms}>
+                🧹 {t('emptyRooms')}
+              </button>
+              <button className="admin-btn" onClick={clearAllLobbies}>
+                🗑️ {t('clearAllLobbies')}
+              </button>
+            </div>
+          </div>
         )}
+        <div className="game-options">
+          {admin && (
+            <>
+              <label className="option-label">
+                <input type="checkbox" checked={stacking} onChange={e => setStacking(e.target.checked)} />
+                {t('stacking')}
+              </label>
+              <label className="option-label">
+                <input type="checkbox" checked={multi} onChange={e => setMulti(e.target.checked)} />
+                {t('multiPlay')}
+              </label>
+            </>
+          )}
+        </div>
         <button onClick={start}>{t('start')}</button>
       </div>
     );
@@ -631,6 +760,13 @@ function App() {
           <>
             <h3>{t('viewing')}: {viewingPlayer?.name}</h3>
             {!follow && <button onClick={() => setFollow(true)}>{t('follow')}</button>}
+            {admin && (
+              <div className="spectator-admin-controls">
+                <button className="admin-control-btn" onClick={clearAllLobbies} title={t('clearAllLobbies')}>
+                  🗑️ {t('clearAllLobbies')}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <h3>{t('yourHand')} {myTurn ? t('yourTurn') : ''}</h3>
@@ -706,8 +842,8 @@ function App() {
               {p.name}: {p.hand.length} {t('cards')}
               {admin && p.id !== id && (
                 <>
-                  <button className="mini-btn" onClick={() => makeAI(p.id)}>🤖</button>
-                  <button className="mini-btn" onClick={() => kickPlayer(p.id)}>✖️</button>
+                  <button className="mini-btn" onClick={() => makeAI(p.id)} title={t('makeAI')}>🤖</button>
+                  <button className="mini-btn" onClick={() => kickPlayer(p.id)} title={t('kickPlayer')}>✖️</button>
                 </>
               )}
             </li>
@@ -729,9 +865,26 @@ function App() {
   return (
     <>
       <header className="app-header">
-        <h1 className="app-title" data-version={pkg.version} title={pkg.version} onClick={handleTitleClick}>{lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}</h1>
-        {admin && <span className="admin-badge">ADMIN</span>}
-        {admin && <button className="empty-btn" onClick={emptyRooms}>{t('emptyRooms')}</button>}
+        <h1 
+          className="app-title" 
+          title={`Version ${pkg.version}`} 
+          onClick={handleTitleClick}
+          data-clicks={titleClicks}
+        >
+          {lang === 'tr' ? 'Uno Oyunu' : 'Uno Game'}
+          <span className="version-badge">v{pkg.version}</span>
+          {admin && <span className="admin-badge">ADMIN</span>}
+        </h1>
+        {admin && (
+          <>
+            <button className="admin-control-btn" onClick={emptyRooms} title={t('emptyRooms')}>
+              🧹 {t('emptyRooms')}
+            </button>
+            <button className="admin-control-btn" onClick={clearAllLobbies} title={t('clearAllLobbies')}>
+              🗑️ {t('clearAllLobbies')}
+            </button>
+          </>
+        )}
       </header>
       {content}
       {colorPicker && (
